@@ -222,6 +222,7 @@ double RBF_Core::Dist_Function(const double *p){
 
     const double *p_pts = pts.data();
     double G[3];
+    kern_.zeros();
     for(int i=0;i<npt;++i) kern_(i) = Kernal_Function_2p(p_pts+i*3, p);
     for(int i=0;i<key_npt;++i){
         Kernal_Gradient_Function_2p(p,p_pts+i*3,G);
@@ -234,7 +235,9 @@ double RBF_Core::Dist_Function(const double *p){
         }
 
     double poly_part = arma::dot(kb_,b);
+    // double poly_part = 0;
     double re = loc_part + poly_part;
+    // std::cout << " dif re " << re << std::endl;
     return re;
 }
 
@@ -249,6 +252,7 @@ double RBF_Core::evaluate_gradient(double x, double y, double z, double &gx, dou
 
     const double *p_pts = pts.data();
     double G[3];
+    kern_.zeros();
     for(int i=0;i<npt;++i) kern_(i) = Kernal_Function_2p(p_pts+i*3, pt);
     for(int i=0;i<key_npt;++i){
         Kernal_Gradient_Function_2p(pt,p_pts+i*3,G);
@@ -258,7 +262,6 @@ double RBF_Core::evaluate_gradient(double x, double y, double z, double &gx, dou
         //for(int j=0;j<3;++j)kern(npt+i*3+j) = -G[j];
         for(int j=0;j<3;++j)kern_(npt+i+j*key_npt) = G[j];
     }
-
 
     arma::mat33 Hess;
     for(int i=0;i<key_npt;++i){
@@ -292,8 +295,84 @@ double RBF_Core::evaluate_gradient(double x, double y, double z, double &gx, dou
 
     double re = loc_part + poly_part;
     return re;
-
 }
+
+void RBF_Core::EvaluateHessian(double x, double y, double z, arma::mat& hessian) 
+{
+    // size_t num_pt = npt;
+    double pt[3] = {x, y, z};
+    
+    arma::mat33 Hess;
+    for(int i=0;i<key_npt;++i){
+        // Kernal_Hessian_Function_2p(pt, p_pts+i*3, H);
+        arma::vec3 diff = {pt[0] - pts[3 *i],pt[1] - pts[3 *i + 1], pt[2] - pts[3 *i + 2]};
+        double len =  sqrt(arma::dot(diff, diff));
+        if (len > 1e-10) {
+           Hess = diff * (diff.t() / len);
+            Hess(0, 0) += len;
+            Hess(1, 1) += len;
+            Hess(2, 2) += len;
+            Hess *= 3;
+            hessian += a[i] * Hess;
+            // std::cout << " hessian 0 " << hessian << std::endl;
+        }
+        double dx = diff(0);
+        double dy = diff(1);
+        double dz = diff(2);
+        double l3 = len * len * len;
+        if (len > 1e-10) {
+            // cal H(Dx)
+            Hess(0, 0) = 3 * dx / len -  dx * dx * dx / l3;
+            Hess(0, 1) =  dy / len -  dx * dx * dy / l3;
+            Hess(0, 2) =  dz / len -  dx * dx * dz / l3;
+
+            Hess(1, 0) = dy / len -  dx * dx * dy / l3;
+            Hess(1, 1) = dx / len -  dx * dy * dy / l3;
+            Hess(1, 2) =  - dx * dz * dy / l3;
+
+            Hess(2, 0) = dz / len - dx * dx * dz / l3;
+            Hess(2, 1) =  -  dx * dz * dy / l3;
+            Hess(2, 2) =  dx / len - dx * dz * dz / l3;
+            Hess = a[npt  + i] * 3.0 * Hess; 
+            hessian += Hess;
+            // std::cout << " hessian 1 " << Hess << std::endl;
+
+            // cal H(Dy)
+            Hess(0, 0) = dy / len - dx * dx * dy / l3;
+            Hess(0, 1) = dx / len - dx * dy * dy / l3;
+            Hess(0, 2) =  - dx * dy * dz / l3;
+
+            Hess(1, 0) = dx / len - dx * dy * dy / l3;
+            Hess(1, 1) = 3* dy / len - dy * dy * dy / l3;
+            Hess(1, 2) = dz / len - dy * dy * dz / l3;
+
+            Hess(2, 0) = - dx * dy * dz / l3;
+            Hess(2, 1) = dz / len - dy * dy * dz / l3;
+            Hess(2, 2) = dy / len - dy * dz * dz / l3;
+            hessian += a[npt + key_npt + i] * Hess * 3.0;
+
+            // std::cout << " hessian 2 " << Hess << std::endl;
+
+            // cal H(Dz)
+            Hess(0, 0) = dz / len - dx * dx * dz / l3;
+            Hess(0, 1) = - dx * dy * dz / l3;
+            Hess(0, 2) = dx / len -  dx * dz * dz / l3;
+
+            Hess(1, 0) =  -  dx * dy * dz / l3;
+            Hess(1, 1) =  dz / len -  dy * dy * dz / l3;
+            Hess(1, 2) =  dy / len -  dy * dz * dz / l3;
+
+            Hess(2, 0) = dx / len - dx * dz * dz / l3;
+            Hess(2, 1) = dy / len - dy * dz * dz / l3;
+            Hess(2, 2) = 3 * dz / len - dz * dz * dz / l3;
+            hessian += a[npt + key_npt * 2 + i] * 3.0 * Hess;
+            // std::cout << " hessian 3 " << Hess << std::endl;
+        }
+    }
+
+    return ;
+}
+
 
 int RBF_Core::DistFuncCallNum = 0;
 double RBF_Core::DistFuncCallTime = 0.0;
@@ -494,7 +573,6 @@ std::vector<double> RBF_Core::EstimateNormals(const std::vector<double>& pts)
         double curPzN[3] = {x, y, z - delt};
         double curPzO[3] = {x, y, z + delt};
         double dz = (this->Dist_Function(curPzO) -this->Dist_Function(curPzN))/ (2 * delt);
-
         double len = std::max(sqrt(dx * dx + dy * dy + dz * dz), 1e-8);
 
         // out_normals.push_back(dx / len);

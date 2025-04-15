@@ -9,9 +9,9 @@ void cal_bbox(const std::vector<double>&pts, Point& min_corner, Point& max_corne
     double min_y = std::numeric_limits<double>::max();
     double min_z = std::numeric_limits<double>::max();
 
-    double max_x = std::numeric_limits<double>::min();
-    double max_y = std::numeric_limits<double>::min();
-    double max_z = std::numeric_limits<double>::min();
+    double max_x = std::numeric_limits<double>::lowest();
+    double max_y = std::numeric_limits<double>::lowest();
+    double max_z = std::numeric_limits<double>::lowest();
 
     const auto& in_pts = pts;
     for(size_t i =0; i < in_pts.size()/3; ++i)

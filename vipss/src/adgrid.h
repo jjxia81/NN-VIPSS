@@ -38,12 +38,31 @@ public:
     {
         // std::cout << "pt : " << x << " " << y << " " << z << std::endl;
         R3Pt newPt(x, y, z);
+        // double dist_val0 = LocalVipss::NNDistFunction(newPt) - offset_;
         double gradient[3];
         double dist_val = LocalVipss::NNDistGradient(newPt, gradient) - offset_;
+
+        // std::cout << "dist_val0 : " << dist_val0 << "  dist_val : " << dist_val << std::endl;
         
         gx = gradient[0];
         gy = gradient[1];
         gz = gradient[2];
+
+        // // Partial derivative with respect to x 
+        // double h = 0.00001;
+        // double fxa = LocalVipss::NNDistFunction({x + h, y, z});
+        // double fxb = LocalVipss::NNDistFunction({x - h, y, z});
+        // gx = (fxa - fxb) / (2.0 * h);
+        
+        // // Partial derivative with respect to y
+        // double fya = LocalVipss::NNDistFunction({x, y + h, z});
+        // double fyb = LocalVipss::NNDistFunction({x, y - h, z});
+        // gy = (fya - fyb) / (2.0 * h);
+        
+        // // Partial derivative with respect to z
+        // double fza = LocalVipss::NNDistFunction({x, y, z + h});
+        // double fzb = LocalVipss::NNDistFunction({x, y, z - h});
+        // gz = (fza - fzb) / (2.0 * h);
 
         // std::cout << "analytic dist_val : " << dist_val << std::endl;
         // double dist_val = LocalVipss::NNDistFunction(newPt);
@@ -113,5 +132,7 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
                             const std::string& outdir,
                             const std::string& fillname, 
                             std::vector<shared_ptr<ImplicitFunction<double>>>& functions,
-                            double threshold = 0.001);
+                            double threshold,
+                            std::vector<std::array<double, 3> >& output_vertices,
+                            std::vector<std::array<size_t, 3> >& output_triangles);
 

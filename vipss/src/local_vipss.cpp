@@ -129,12 +129,14 @@ void LocalVipss::VisualFuncValues(double (*function)(const R3Pt &in_pt), const V
 void LocalVipss::Init(const std::string & path, const std::string& ext)
 {   
     std::vector<double> in_pts;
-    std::vector<double> in_normals;
+    // std::vector<double> in_normals;
+    input_normals_.clear();
     if(ext == ".ply") 
     {
-        readPLYFile(path, in_pts, in_normals);
+        readPLYFile(path, in_pts, input_normals_);
     } else {
-        readXYZ(path, in_pts);
+        
+        readXYZnormal(path, in_pts, input_normals_);
     }
     bool normalize_init_pts = true;
 
@@ -1185,37 +1187,58 @@ double LocalVipss::NatureNeighborDistanceFunctionOMP(const tetgenmesh::point cur
     search_nn_time_sum_ += search_nn_time;
     // printf("nn num %ld \n", nei_pts.size());
     size_t nn_num = nei_pts.size();
-    int i;  
     auto t0 = Clock::now();
     arma::vec nn_dist_vec_(nn_num);
     arma::vec nn_volume_vec_(nn_num);
     ave_voxel_nn_pt_num_ += nn_num;
     const std::vector<double*>& all_pts = points_;
-    // arma::vec dummy_vals(nn_num);
+    // int max_nn_num = 1000;
+    
+    arma::vec nn_pt_dist_vec_(nn_num);
+
+    // bool over_max_nn_num = nn_num > max_nn_num;
+    // if(over_max_nn_num)
+    // {
+    //     #pragma omp parallel for     
+    //     for(int ni = 0; ni < nn_num; ++ni)
+    //     {
+    //         nn_pt_dist_vec_[ni] = PtDistance(cur_pt, nei_pts[ni]);
+    //     }
+    // }
+    // arma::uvec dist_ids = arma::sort_index(nn_pt_dist_vec_);
+    
 #pragma omp parallel for 
 // #pragma omp parallel for shared(nei_pts, cur_pt, nn_dist_vec_, nn_volume_vec_) private(i)    
-    for( i = 0; i < nn_num; ++i)
+    for(int i = 0; i < nn_num; ++i)
     {
-        auto nn_pt = nei_pts[i];
-        if(VoronoiGen::point_id_map_.find(nn_pt) != VoronoiGen::point_id_map_.end())
+        // if(i < max_nn_num)
         {
-            size_t pid = VoronoiGen::point_id_map_[nn_pt];
-            // std::cout << " n id 1111  " << pid << std::endl;
-            const arma::vec& a = node_rbf_vec_[pid]->a;
-            const arma::vec& b = node_rbf_vec_[pid]->b;
-            const auto& cluster_pids = VoronoiGen::cluster_init_pids_[pid];
-            // std::cout << " n id 2222  " << pid << std::endl;
-            // std::cout << " cluster_pids size  " << cluster_pids.size() << std::endl;
-            // std::cout << " all_pts size  " << all_pts.size() << std::endl;
-            // std::cout << " a size  " << a.size() << std::endl;
-            // std::cout << " b size  " << b.size() << std::endl;
-            nn_dist_vec_[i] = HRBF_Dist_Alone(cur_pt,  a, b, cluster_pids, all_pts);
-            // std::cout << " cur pt dist :  " << nn_dist_vec_[i] << std::endl;
-            int thread_id = omp_get_thread_num();
-            // nn_volume_vec_[i] = 1.0;
-            nn_volume_vec_[i] = voro_gen_.CalTruncatedCellVolumePassOMP(cur_pt, nn_pt, thread_id); 
-        } 
+            // auto nn_pt = over_max_nn_num ? nei_pts[dist_ids[i]] : nei_pts[i];
+            auto nn_pt = nei_pts[i];
+            if(VoronoiGen::point_id_map_.find(nn_pt) != VoronoiGen::point_id_map_.end())
+            {
+                size_t pid = VoronoiGen::point_id_map_[nn_pt];
+                // std::cout << " n id 1111  " << pid << std::endl;
+                const arma::vec& a = node_rbf_vec_[pid]->a;
+                const arma::vec& b = node_rbf_vec_[pid]->b;
+                const auto& cluster_pids = VoronoiGen::cluster_init_pids_[pid];
+                // std::cout << " n id 2222  " << pid << std::endl;
+                // std::cout << " cluster_pids size  " << cluster_pids.size() << std::endl;
+                // std::cout << " all_pts size  " << all_pts.size() << std::endl;
+                // std::cout << " a size  " << a.size() << std::endl;
+                // std::cout << " b size  " << b.size() << std::endl;
+                // nn_dist_vec_[i] = HRBF_Dist_Alone(cur_pt,  a, b, cluster_pids, all_pts);
+                nn_dist_vec_[i] = node_rbf_vec_[pid]->Dist_Function(cur_pt[0], cur_pt[1], cur_pt[2]);
+                // std::cout << " cur pt dist :  " << nn_dist_vec_[i] << std::endl;
+                int thread_id = omp_get_thread_num();
+                // nn_volume_vec_[i] = 1.0;
+                nn_volume_vec_[i] = voro_gen_.CalTruncatedCellVolumePassOMP(cur_pt, nn_pt, thread_id); 
+            } 
+        }
     }
+
+    // std::cout << "nn_dist_vec_ " << nn_dist_vec_[0] << " " << nn_dist_vec_[1] << " " << nn_dist_vec_[2] << " "  << std::endl;
+
     auto t1 = Clock::now();
     double pass_time = std::chrono::nanoseconds(t1 - t0).count()/1e9;
     pass_time_sum_ += pass_time;
@@ -1244,6 +1267,7 @@ double LocalVipss::NatureNeighborGradientOMP(const tetgenmesh::point cur_pt, dou
     auto t0 = Clock::now();
     arma::vec nn_dist_vec_(nn_num);
     arma::vec nn_volume_vec_(nn_num);
+    arma::vec nn_compare_volume_vec_(nn_num);
     arma::vec gx_vec_(nn_num);
     arma::vec gy_vec_(nn_num);
     arma::vec gz_vec_(nn_num);
@@ -1262,21 +1286,33 @@ double LocalVipss::NatureNeighborGradientOMP(const tetgenmesh::point cur_pt, dou
             size_t pid = VoronoiGen::point_id_map_[nn_pt];
             const arma::vec& a = node_rbf_vec_[pid]->a;
             const arma::vec& b = node_rbf_vec_[pid]->b;
-            // const std::vector<size_t>& cluster_pids = VoronoiGen::cluster_init_pids_[pid];
-            // nn_dist_vec_[i] = HRBF_Dist_Alone(cur_pt,  a, b, cluster_pids, all_pts);
+            const auto& cluster_pids = VoronoiGen::cluster_init_pids_[pid];
+            // double dist_val = HRBF_Dist_Alone(cur_pt,  a, b, cluster_pids, all_pts);
+            // double dist_val = node_rbf_vec_[pid]->Dist_Function(cur_pt[0], cur_pt[1], cur_pt[2]);
+            
             // nn_dist_vec_[i] = 1;
             double gx, gy, gz;
             nn_dist_vec_[i] = node_rbf_vec_[pid]->evaluate_gradient(cur_pt[0],cur_pt[1], cur_pt[2], gx, gy, gz);
+            double pure_dist = node_rbf_vec_[pid]->Dist_Function(cur_pt[0], cur_pt[1], cur_pt[2]);
+
+            
             gx_vec_[i] = gx;
             gy_vec_[i] = gy;
             gz_vec_[i] = gz;
+
             int thread_id = omp_get_thread_num();
             // nn_volume_vec_[i] = voro_gen_.CalTruncatedCellVolumePassOMP(cur_pt, nn_pt, thread_id); 
+            // nn_compare_volume_vec_[i] = voro_gen_.CalTruncatedCellVolumePassOMP(cur_pt, nn_pt, thread_id);
             arma::vec3 vol_grad; 
             nn_volume_vec_[i] = voro_gen_.CalTruncatedCellVolumeGradientOMP(cur_pt, nn_pt, vol_grad, thread_id);
             nn_vol_grads_[i] = vol_grad;
+            
         }
     }
+
+    // std::cout << "  nn_volume_vec_[i] " <<  nn_volume_vec_[i] << "  , nn_compare_volume_vec_[i]" << nn_compare_volume_vec_[i] << std::endl;
+
+    // std::cout << " gradient nn_dist_vec_ " << nn_dist_vec_[0] << " " << nn_dist_vec_[1] << " " << nn_dist_vec_[2] << " "  << std::endl;
 
     auto t1 = Clock::now();
     double pass_time = std::chrono::nanoseconds(t1 - t0).count()/1e9;
@@ -1299,17 +1335,78 @@ double LocalVipss::NatureNeighborGradientOMP(const tetgenmesh::point cur_pt, dou
         gradient[1] += arma::dot(nn_volume_vec_, gy_vec_) / volume_sum;
         gradient[2] += arma::dot(nn_volume_vec_, gz_vec_) / volume_sum;
 
-        // arma::vec3 partial_grad = {0, 0, 0};
-        // for(int vi = 0; vi < nn_num; ++vi)
-        // {
-        //     partial_grad += nn_dist_vec_[vi] / (volume_sum * volume_sum) * ( volume_sum * nn_vol_grads_[vi] - nn_volume_vec_[vi] * vol_grads_sum);
-        // }
-        // gradient[0] += partial_grad[0];
-        // gradient[1] += partial_grad[1];
-        // gradient[2] += partial_grad[2];
+        arma::vec3 partial_grad = {0, 0, 0};
+        for(int vi = 0; vi < nn_num; ++vi)
+        {
+            partial_grad += nn_dist_vec_[vi] / (volume_sum * volume_sum) * ( volume_sum * nn_vol_grads_[vi] - nn_volume_vec_[vi] * vol_grads_sum);
+        }
+        gradient[0] += partial_grad[0];
+        gradient[1] += partial_grad[1];
+        gradient[2] += partial_grad[2];
+
         return arma::dot(nn_dist_vec_, nn_volume_vec_) / volume_sum;
     }
     return 0;
+}
+
+arma::mat LocalVipss::NNHRBFHessianOMP(const tetgenmesh::point cur_pt) const
+{
+    std::vector<tetgenmesh::point> nei_pts;
+    auto tn0 = Clock::now();
+    // printf("start to get nei pts \n");
+    voro_gen_.GetVoronoiNeiPts(cur_pt, nei_pts);
+    auto tn1 = Clock::now();
+    double search_nn_time = std::chrono::nanoseconds(tn1 - tn0).count()/1e9;
+    search_nn_time_sum_ += search_nn_time;
+    // printf("nn num %ld \n", nei_pts.size());
+    size_t nn_num = nei_pts.size();
+    int i;  
+    auto t0 = Clock::now();
+    arma::vec nn_dist_vec_(nn_num);
+    arma::vec nn_volume_vec_(nn_num);
+    arma::vec gx_vec_(nn_num);
+    arma::vec gy_vec_(nn_num);
+    arma::vec gz_vec_(nn_num);
+    std::vector<arma::vec3> nn_vol_grads_(nn_num);
+    
+    ave_voxel_nn_pt_num_ += nn_num;
+    const std::vector<double*>& all_pts = points_;
+    std::vector<arma::mat> hessian_mats(nn_num);
+
+#pragma omp parallel for
+//  shared(node_rbf_vec_, voro_gen_, VoronoiGen::point_id_map_, nei_pts, cur_pt, nn_dist_vec_, nn_volume_vec_) private(i)
+    for( i = 0; i < nn_num; ++i)
+    {
+        auto nn_pt = nei_pts[i];
+        hessian_mats[i] = arma::zeros(3, 3); 
+        if(VoronoiGen::point_id_map_.find(nn_pt) != VoronoiGen::point_id_map_.end())
+        {
+            size_t pid = VoronoiGen::point_id_map_[nn_pt];
+            // const arma::vec& a = node_rbf_vec_[pid]->a;
+            // const arma::vec& b = node_rbf_vec_[pid]->b;
+            node_rbf_vec_[pid]->EvaluateHessian(cur_pt[0],cur_pt[1], cur_pt[2], hessian_mats[i]);
+            // const std::vector<size_t>& cluster_pids = VoronoiGen::cluster_init_pids_[pid];
+            // nn_dist_vec_[i] = HRBF_Dist_Alone(cur_pt,  a, b, cluster_pids, all_pts);
+            // nn_dist_vec_[i] = 1;
+            int thread_id = omp_get_thread_num();
+            nn_volume_vec_[i] = voro_gen_.CalTruncatedCellVolumePassOMP(cur_pt, nn_pt, thread_id);
+        }
+    }
+
+    auto t1 = Clock::now();
+    double pass_time = std::chrono::nanoseconds(t1 - t0).count()/1e9;
+    pass_time_sum_ += pass_time;
+    double volume_sum = arma::accu(nn_volume_vec_);
+    arma::mat hessian_mat = arma::zeros(3,3);
+    for( i = 0; i < nn_num; ++i)
+    {
+        hessian_mat += hessian_mats[i] * nn_volume_vec_[i];
+    }
+    if(volume_sum > 1e-20)
+    {
+        hessian_mat /= volume_sum;
+    }
+    return hessian_mat;
 }
 
 
@@ -1341,6 +1438,7 @@ void LocalVipss::InitNormalWithVipss()
     G_VP_stats.max_cluster_size = (int) arma::max(VoronoiGen::cluster_size_vec_);
     std::cout << " ave cluter pt number :  " << G_VP_stats.ave_cluster_size << std::endl;
     std::cout << " stand dev :  " << G_VP_stats.cluster_std_dev << std::endl;
+    std::cout << " max_cluster_size  :  " << G_VP_stats.max_cluster_size << std::endl;
 
     
 #pragma omp parallel for 
@@ -1420,6 +1518,28 @@ double LocalVipss::NNDistFunction(const R3Pt &in_pt)
     double dist_time = std::chrono::nanoseconds(t1 - t0).count()/1e9;
     DistCallTime += dist_time;
     return dist;
+}
+
+std::array<double,3> LocalVipss::NumericGradientFunction(const R3Pt &in_pt)
+{
+    double x = in_pt[0];
+    double y = in_pt[1];
+    double z = in_pt[2];
+    double h = 0.00001;
+    double fxa = LocalVipss::NNDistFunction({x + h, y, z});
+    double fxb = LocalVipss::NNDistFunction({x - h, y, z});
+    double gx = (fxa - fxb) / (2.0 * h);
+    
+    // Partial derivative with respect to y
+    double fya = LocalVipss::NNDistFunction({x, y + h, z});
+    double fyb = LocalVipss::NNDistFunction({x, y - h, z});
+    double gy = (fya - fyb) / (2.0 * h);
+    
+    // Partial derivative with respect to z
+    double fza = LocalVipss::NNDistFunction({x, y, z + h});
+    double fzb = LocalVipss::NNDistFunction({x, y, z - h});
+    double gz = (fza - fzb) / (2.0 * h);
+    return {gx, gy, gz};
 }
 
 // double LocalVipss::NNDistFunction(const double* in_pt)
@@ -1540,6 +1660,60 @@ inline bool LocalVipss::FlipClusterNormalSimple(size_t c_a, size_t c_b) const
     }
     double proj1 = arma::dot( normal_maa , normal_mba); 
     if(proj1 < 0) return true;
+    return false;
+}
+
+
+
+inline bool LocalVipss::FlipClusterNormalSimple2(size_t c_a, size_t c_b) const
+{
+    const auto& pa = points_[c_a];
+    const auto& pb = points_[c_b];
+    arma::vec3 vector_ab = {pa[0] - pb[0], pa[1] - pb[1],pa[2] - pb[2]};
+    vector_ab = arma::normalise(vector_ab);
+    arma::vec3 normal_maa;
+    arma::vec3 normal_mbb;
+    {
+        normal_maa(0) =  cluster_normal_x_.coeff(c_a, c_a);
+        normal_maa(1) =  cluster_normal_y_.coeff(c_a, c_a);
+        normal_maa(2) =  cluster_normal_z_.coeff(c_a, c_a);
+        normal_mbb(0) =  cluster_normal_x_.coeff(c_b, c_b);
+        normal_mbb(1) =  cluster_normal_y_.coeff(c_b, c_b);
+        normal_mbb(2) =  cluster_normal_z_.coeff(c_b, c_b);
+    }
+    arma::vec3 ave_normal =  arma::normalise(normal_maa + normal_mbb);
+    double proj = abs(arma::dot(ave_normal, vector_ab));
+
+    if(proj > 0.7) return true;
+    return false;
+}
+
+inline bool LocalVipss::FlipClusterNormal2(size_t c_a, size_t c_b) const
+{
+    const auto& cluster_a = voro_gen_.cluster_init_pids_[c_a];
+    const auto& cluster_b = voro_gen_.cluster_init_pids_[c_b];
+    std::unordered_set<int> cluster_a_set(cluster_a.begin(), cluster_a.end());
+    double dot_sign_sum = 0;
+    // for (auto pid: cluster_b)
+    for (auto pid: {c_a, c_b})
+    {
+        // if(cluster_a_set.find(pid) != cluster_a_set.end()) 
+        {
+            arma::vec3 normal_ma_p;
+            arma::vec3 normal_mb_p;
+            {
+                normal_ma_p(0) =  cluster_normal_x_.coeff(pid, c_a);
+                normal_ma_p(1) =  cluster_normal_y_.coeff(pid, c_a);
+                normal_ma_p(2) =  cluster_normal_z_.coeff(pid, c_a);
+                normal_mb_p(0) =  cluster_normal_x_.coeff(pid, c_b);
+                normal_mb_p(1) =  cluster_normal_y_.coeff(pid, c_b);
+                normal_mb_p(2) =  cluster_normal_z_.coeff(pid, c_b);
+            }
+            double proj = arma::dot( normal_ma_p , normal_mb_p); 
+            dot_sign_sum +=  proj;
+        }
+    }
+    if(dot_sign_sum < 0) return true;
     return false;
 }
 
@@ -1694,7 +1868,6 @@ void LocalVipss::CalculateClusterNeiScores(bool is_init)
     cluster_scores_mat_.setFromTriplets(score_eles.begin(), score_eles.end());
 }
 
-
 // void LocalVipss::InitAdjacentData()
 // {
 //     const auto& adjacent_mat_ = voro_gen_.pt_adjecent_mat_;
@@ -1708,7 +1881,6 @@ void LocalVipss::CalculateClusterNeiScores(bool is_init)
 //         // std::cout << " get col vec by id "<< std::endl;
 //         arma::sp_umat::const_iterator start  = col_vec.begin();
 //         arma::sp_umat::const_iterator end    = col_vec.end();
-
 //         for(auto iter = start; iter != end; ++iter)
 //         {
 //             // cluster_adjacent_ids_[i].insert(size_t(iter.row()));
@@ -1718,10 +1890,8 @@ void LocalVipss::CalculateClusterNeiScores(bool is_init)
 //         cluster_pt_ids_[i].insert(i);
 //     }
 //     // cluster_core_pt_nums_.ones(cols); 
-    
 // }
 
-        
 // void LocalVipss::SaveGroupPtsWithColor(const std::string& path)
 // {
 //     size_t group_size = cluster_cores_mat_.n_cols;
@@ -1789,7 +1959,7 @@ void LocalVipss::BuildClusterMST(bool use_distance_weight = false)
             if(use_distance_weight)
             {
                 double dist = PtDistance(points_[n_id], points_[cur_pid]);
-                edge.score_ = dist * edge.score_; 
+                // edge.score_ = sqrt(dist) * edge.score_;
             }
             edge_priority_queue.push(edge);
         }
@@ -1829,6 +1999,7 @@ void LocalVipss::FlipClusterNormalsByMST()
             if(flipped_cluster_ids.find(n_cid) != flipped_cluster_ids.end()) continue;
             flipped_cluster_ids.insert(n_cid);
             if(FlipClusterNormalSimple(cur_cid, n_cid))
+            // if(FlipClusterNormal2(cur_cid, n_cid))
             {
                 cluster_normal_x_.col(n_cid) *= -1.0;
                 cluster_normal_y_.col(n_cid) *= -1.0;

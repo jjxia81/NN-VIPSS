@@ -155,6 +155,10 @@ void converge ( const R3Pt &in_p1, const R3Pt &p2, double v,
                double (*function)(const R3Pt &in_pt),
                R3Pt &p);
 
+void converge2 ( const R3Pt &in_p1, const R3Pt &in_p2, double v1, double v2,
+double (*function)(const R3Pt &in_pt), 
+R3Pt &out_p);               
+
 TEST find (int sign, PROCESS *p, const R3Pt &in_pt);
 
 
@@ -889,7 +893,8 @@ int vertid (CORNERLIST *c1, CORNERLIST *c2, PROCESS *p) {
    if (vid != -1) return vid;                /* previously computed */
    setpoint (a, c1->i, c1->j, c1->k, p);
    setpoint (b, c2->i, c2->j, c2->k, p);
-   converge (a, b, c1->value, p->function, v.position); /* posn.  */
+//    converge (a, b, c1->value, p->function, v.position); /* posn.  */
+   converge2 (a, b, c1->value, c2->value, p->function, v.position); /* posn.  */
    vnormal(v.position, p, v.normal);                     /* normal */
    vid = addtovertices(&p->vertices, v);                   /* save   */
    setedge(p->edges, c1->i, c1->j, c1->k, c2->i, c2->j, c2->k, vid);
@@ -941,35 +946,64 @@ void vnormal (const R3Pt &in_point, PROCESS *p, R3Vec &out_vec) {
 
 
 /* converge: from two points of differing sign, converge to surface */
-
 void converge ( const R3Pt &in_p1, const R3Pt &in_p2, double v,
                double (*function)(const R3Pt &in_pt), 
-
                R3Pt &out_p)
 {
    int i = 0;
    R3Pt pos, neg;
    if (v < 0) {
-
        pos = in_p2;
-
        neg = in_p1;
-
    }
    else {
        pos = in_p1;
-
        neg = in_p2;
-
    }
    for (;;) {
-
        out_p = Lerp( pos, neg, 0.5 );
-
-
        if (i++ == RES) return;
        if ((function((out_p))) > 0.0)
             {pos = out_p;}
        else {neg = out_p;}
    }
+}
+
+/* converge: from two points of differing sign, converge to surface */
+void converge2 ( const R3Pt &in_p1, const R3Pt &in_p2, double v1, double v2,
+    double (*function)(const R3Pt &in_pt), 
+    R3Pt &out_p)
+{
+    int i = 0;
+    R3Pt pos, neg;
+    double ratio = 0;
+    double pv, nv;
+    if (v1 < 0) {
+        pos = in_p2;
+        neg = in_p1;
+        pv = v2;
+        nv = v1;
+    }
+    else {
+        pos = in_p1;
+        neg = in_p2;
+        pv = v1;
+        nv = v2;
+    }
+    for (;;) {
+        double ratio = abs(pv) / (abs(pv) + abs(nv));
+        out_p = Lerp( pos, neg, ratio);
+        if (i++ == 2) return;
+        double new_v = function(out_p);
+        if (new_v > 0.0)
+        {
+            pos = out_p;
+            pv = new_v;
+            
+        }
+        else {
+            neg = out_p;
+            nv  = new_v;
+        }
+    }
 }

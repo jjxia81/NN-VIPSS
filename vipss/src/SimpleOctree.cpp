@@ -127,9 +127,9 @@ void OctBBox::GetCornersFromPts(const std::vector<double>& pts)
     min_pt_[1] = std::numeric_limits<double>::max();
     min_pt_[2] = std::numeric_limits<double>::max();
 
-    max_pt_[0] = std::numeric_limits<double>::min();
-    max_pt_[1] = std::numeric_limits<double>::min();
-    max_pt_[2] = std::numeric_limits<double>::min();
+    max_pt_[0] = std::numeric_limits<double>::lowest();
+    max_pt_[1] = std::numeric_limits<double>::lowest();
+    max_pt_[2] = std::numeric_limits<double>::lowest();
 
     for(size_t i = 0; i < ptn; ++i)
     {
@@ -150,9 +150,9 @@ void OctBBox::GetCornersFromPts(const std::vector<Point>& pts)
     min_pt_[1] = std::numeric_limits<double>::max();
     min_pt_[2] = std::numeric_limits<double>::max();
 
-    max_pt_[0] = std::numeric_limits<double>::min();
-    max_pt_[1] = std::numeric_limits<double>::min();
-    max_pt_[2] = std::numeric_limits<double>::min();
+    max_pt_[0] = std::numeric_limits<double>::lowest();
+    max_pt_[1] = std::numeric_limits<double>::lowest();
+    max_pt_[2] = std::numeric_limits<double>::lowest();
 
     std::cout << " input pt size : " << ptn << std::endl;
 

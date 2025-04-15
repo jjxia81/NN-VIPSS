@@ -3,6 +3,7 @@
 #include "voronoi_gen.h"
 #include "local_vipss.hpp"
 #include "Solver.h"
+#include "vipss_ridges.h"
 
 enum AXI_PlANE {
         XYZ,
@@ -33,8 +34,11 @@ class VIPSSUnit {
         void OptUnitVipssNormalDirect();
         void OptUnitVipssNormal();
         void ReconSurface();
+        void ReconSurfaceHRBF(std::shared_ptr<RBF_Core> HRBF_ptr);
         void GenerateAdaptiveGrid();
         void Run();
+        void RunRidges();
+        void RunRidgesGHRBF();
         void test_partial_vipss();
         void BuildTetCentersMap();
         void BuildLocalHRBFPerNode();
@@ -43,6 +47,11 @@ class VIPSSUnit {
         void SolveOptimizaiton();
         void BuildNNHRBFFunctions();
         void CompareMeshDiff( std::shared_ptr<RBF_Core> rbf_func);
+        void GenerateGridPts();
+    private:
+        void AdaptiveGridHRBF(std::shared_ptr<RBF_Core> rbf_func, 
+                    std::vector<std::array<double, 3> >& output_vertices,
+                    std::vector<std::array<size_t, 3> >& output_triangles);
 
     public:
         std::string file_name_;
@@ -53,6 +62,8 @@ class VIPSSUnit {
         std::string out_debug_path_;
         std::string input_data_path_;
         std::string input_data_ext_;
+        std::string ridge_mesh_path_;
+        std::string ridge_edges_save_path_;
 
         bool open_debug_ = false;
         bool is_surfacing_ = true;
@@ -63,6 +74,7 @@ class VIPSSUnit {
         RBF_API rbf_api_;
         // arma::sp_imat adjacent_mat_;
         arma::vec sg_;
+        VIPSSRidges vipss_ridges_;
         
         // std::vector<arma::mat> local_M_vec_;
         // std::vector<arma::mat> local_J_vec_;
@@ -92,6 +104,8 @@ class VIPSSUnit {
         std::vector<std::shared_ptr<RBF_Core*>> node_rbf_vec;
         std::vector<double>finalMesh_v_;
         std::vector<uint>finalMesh_fv_;
+        std::vector<std::array<double,3>> grid_pts_;
+        std::vector<double> grid_pts_dist_vals_; 
 
         HRBF_SURFACE_TYPE hrbf_type_;
 

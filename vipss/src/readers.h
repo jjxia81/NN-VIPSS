@@ -107,4 +107,37 @@ void WriteStatsTimeCSV(const std::string& path, const VP_STATS& vp_stats);
 void WriteVectorValsToCSV(const std::string& path, const std::vector<double>& vector_vals);
 // void WriteStatsTimeCSV(const std::string& path, const VP_STATS& vp_stats);
 std::vector<double> ReadVectorFromFile(const std::string& filename) ;
+
+
+void SaveMeshWithQualityToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<double>& point_qualities,
+               const std::vector<std::array<size_t, 3>> &faces);
+
+void SaveMeshToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<std::vector<size_t>> &faces);
+
+void SaveMeshToPly(const std::string &filename, 
+                const std::vector<std::array<double,3>> &points, 
+                const std::vector<double> &points_quality, 
+                const std::vector<std::vector<size_t>> &faces);
+
+void SaveMeshToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<std::array<size_t, 3>> &faces);
+
+void SaveTetMeshToPly(const std::vector<std::array<double, 3>>& vertices, 
+                      const std::vector<std::array<size_t, 4>>& tets,
+                     const std::vector<double>& values, const std::string& file_path);
+
+void SavePointsWithQualityToPLY(const std::string& filename, 
+                        const std::vector<std::array<double,3>>& points,
+                        const std::vector<double>& qualtity);
+
+bool SaveTetToFile(const std::vector<std::array<double, 3>>& vertices, 
+    const std::vector<std::array<size_t, 4>>& tet, const std::string& filename);
+
+bool ReadTetFromFile(std::vector<std::array<double, 3>>& vertices, 
+        std::vector<std::array<size_t, 4>>& tet, const std::string& filename);     
 #endif // READERS_H

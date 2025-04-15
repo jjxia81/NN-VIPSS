@@ -20,9 +20,9 @@ public:
 
     void Init(const std::vector<double>& in_pts);
     void Init(const std::vector<double*>& in_pts);
-    int SearchNearestPt(double x, double y, double z);
-    double NearestPtDist(double x, double y, double z);
-    std::vector<int> SearchNearestKNN(double x, double y, double z, int k);
+    int SearchNearestPt(double x, double y, double z) const;
+    double NearestPtDist(double x, double y, double z) const;
+    std::vector<int> SearchNearestKNN(double x, double y, double z, int k) const;
 
 public:
     // pico_tree::KdTree<Space> kdtree_;

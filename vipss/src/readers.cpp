@@ -5,6 +5,7 @@
 #include<sstream>
 #include<assert.h>
 #include "happly.h"
+#include <unordered_set>
 using namespace std;
 
 bool readOffFile(string filename,vector<double>&vertices,vector<unsigned int>&faces2vertices){
@@ -1362,7 +1363,6 @@ bool readXYZ(string filename, vector<double>&v){
             v.push_back(x);
             v.push_back(y);
             v.push_back(z);
-
         }
         // Ignore the rest of the line (e.g., normals or other attributes)
     }
@@ -1376,26 +1376,60 @@ bool readXYZ(string filename, vector<double>&v){
     return true;
 }
 
+// bool readXYZnormal(string filename, vector<double>&v, vector<double>&vn){
+
+//     ifstream reader(filename.data(), ofstream::in);
+//     if (!reader.good()) {
+//         cout << "Can not open the file " << filename << endl;
+//         return false;
+//     }else {
+//         cout << "Reading: "<<filename<<endl;
+//     }
+//     v.clear();
+//     vn.clear();
+//     double val;
+//     while(!reader.eof()){
+//         for(size_t i=0;i<3;++i){reader>>val;v.push_back(val);}
+//         for(size_t i=0;i<3;++i){reader>>val;vn.push_back(val);}
+//     }
+//     reader.close();
+
+//     return true;
+// }
+
+
 bool readXYZnormal(string filename, vector<double>&v, vector<double>&vn){
 
-    ifstream reader(filename.data(), ofstream::in);
-    if (!reader.good()) {
-        cout << "Can not open the file " << filename << endl;
+     std::ifstream xyzFile(filename);
+    if (!xyzFile) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
         return false;
-    }else {
-        cout << "Reading: "<<filename<<endl;
     }
-    v.clear();
-    vn.clear();
-    double val;
-    while(!reader.eof()){
-        for(size_t i=0;i<3;++i){reader>>val;v.push_back(val);}
-        for(size_t i=0;i<3;++i){reader>>val;vn.push_back(val);}
+    std::string line;
+    double x, y, z, nx, ny, nz;
+    while (std::getline(xyzFile, line)) {
+        std::istringstream iss(line);
+        // Point3D point;
+        // Try reading 6 values (x, y, z, nx, ny, nz)
+        if (!(iss >> x >> y >> z)) {
+            continue;
+        }
+        v.push_back(x); 
+        v.push_back(y); 
+        v.push_back(z); 
+        // Check if normals are present
+        if (!(iss >> nx >> ny >> nz)) {
+            nx = ny = nz = 0.0;  // Default to (0,0,0) if normals are missing
+        }
+        vn.push_back(nx); 
+        vn.push_back(ny); 
+        vn.push_back(nz); 
     }
-    reader.close();
-
+    xyzFile.close();
+    std::cout << "Successfully read data from " << filename << std::endl;
     return true;
 }
+
 
 bool writeXYZ(string filename, vector<double>&v){
 
@@ -1658,7 +1692,396 @@ std::vector<double> ReadVectorFromFile(const std::string& filename) {
             vec.push_back(value);
         }
     }
-
     inFile.close();
     return vec;
+}
+
+
+void SaveMeshWithQualityToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<double>& point_qualities,
+               const std::vector<std::array<size_t, 3>> &faces) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        std::cerr << "Error: Unable to open file for writing!\n";
+        return;
+    }
+
+    // Write PLY header
+    outFile << "ply\n";
+    outFile << "format ascii 1.0\n";
+    outFile << "element vertex " << points.size() << "\n";
+    outFile << "property float x\n";
+    outFile << "property float y\n";
+    outFile << "property float z\n";
+    outFile << "property float quality\n";  // Quality attribute
+    outFile << "element face " << faces.size() << "\n";
+    outFile << "property list uchar int vertex_indices\n";
+    outFile << "end_header\n";
+
+    // Write vertex data
+    for (int i= 0; i < points.size(); ++i) {
+        const auto& p = points[i];
+        double quality = point_qualities[i];
+        outFile << p[0] << " " << p[1] << " " << p[2] << " " << quality << "\n";
+    }
+
+    // Write face data
+    for (const auto &face : faces) {
+        outFile << face.size();
+        for(auto vid : face)
+        {
+            outFile << " " << vid;
+        }
+        outFile << "\n";
+    }
+
+    outFile.close();
+    std::cout << "PLY file saved successfully: " << filename << std::endl;
+}
+
+
+
+void SaveMeshToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<std::vector<size_t>> &faces) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        std::cerr << "Error: Unable to open file for writing!\n";
+        return;
+    }
+
+    // Write PLY header
+    outFile << "ply\n";
+    outFile << "format ascii 1.0\n";
+    outFile << "element vertex " << points.size() << "\n";
+    outFile << "property float x\n";
+    outFile << "property float y\n";
+    outFile << "property float z\n";
+    outFile << "element face " << faces.size() << "\n";
+    outFile << "property list uchar int vertex_indices\n";
+    outFile << "end_header\n";
+
+    // Write vertex data
+    for (int i= 0; i < points.size(); ++i) {
+        const auto& p = points[i];
+        outFile << p[0] << " " << p[1] << " " << p[2] << "\n";
+    }
+
+    // Write face data
+    for (const auto &face : faces) {
+        outFile << face.size();
+        for(auto vid : face)
+        {
+            outFile << " " << vid;
+        }
+        outFile << "\n";
+    }
+
+    outFile.close();
+    std::cout << "PLY file saved successfully: " << filename << std::endl;
+}
+
+
+void SaveMeshToPly(const std::string &filename, 
+    const std::vector<std::array<double,3>> &points, 
+    const std::vector<double> &points_quality, 
+    const std::vector<std::vector<size_t>> &faces) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+    std::cerr << "Error: Unable to open file for writing!\n";
+    return;
+    }
+
+    // Write PLY header
+    outFile << "ply\n";
+    outFile << "format ascii 1.0\n";
+    outFile << "element vertex " << points.size() << "\n";
+    outFile << "property float x\n";
+    outFile << "property float y\n";
+    outFile << "property float z\n";
+    outFile << "property float quality\n";
+    outFile << "element face " << faces.size() << "\n";
+    outFile << "property list uchar int vertex_indices\n";
+    outFile << "end_header\n";
+
+    // Write vertex data
+    for (int i= 0; i < points.size(); ++i) {
+        const auto& p = points[i];
+        outFile << p[0] << " " << p[1] << " " << p[2] << " " << points_quality[i] << "\n";
+    }
+
+    // Write face data
+    for (const auto &face : faces) {
+    outFile << face.size();
+    for(auto vid : face)
+    {
+    outFile << " " << vid;
+    }
+    outFile << "\n";
+    }
+
+    outFile.close();
+    std::cout << "PLY file saved successfully: " << filename << std::endl;
+}
+
+
+void SaveMeshToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<std::array<size_t, 3>> &faces) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        std::cerr << "Error: Unable to open file for writing!\n";
+        return;
+    }
+
+    // Write PLY header
+    outFile << "ply\n";
+    outFile << "format ascii 1.0\n";
+    outFile << "element vertex " << points.size() << "\n";
+    outFile << "property float x\n";
+    outFile << "property float y\n";
+    outFile << "property float z\n";
+    outFile << "element face " << faces.size() << "\n";
+    outFile << "property list uchar int vertex_indices\n";
+    outFile << "end_header\n";
+
+    // Write vertex data
+    for (int i= 0; i < points.size(); ++i) {
+        const auto& p = points[i];
+        outFile << p[0] << " " << p[1] << " " << p[2] << "\n";
+    }
+
+    // Write face data
+    for (const auto &face : faces) {
+        outFile << "3 " <<  face[0] << " " << face[1] << " " << face[2] << std::endl;
+    }
+
+    outFile.close();
+    std::cout << "PLY file saved successfully: " << filename << std::endl;
+}
+
+void GetTetEdges(const vector<array<size_t, 4>>& tets, std::vector<std::array<size_t, 2>>& edges)
+{
+    std::unordered_set<string> edge_keys;
+    std::vector<std::array<size_t, 2>> tet_edges = {{0,1}, {0,2}, {0,3}, {1, 2}, {1, 3}, {2, 3}}; 
+    for(const auto& tet : tets)
+    {
+        for(const auto& e : tet_edges)
+        {
+            int pa_id = tet[e[0]];  
+            int pb_id = tet[e[1]];  
+            std::array<size_t, 2> edge = pa_id < pb_id ? std::array<size_t, 2>{pa_id, pb_id} 
+                                                        : std::array<size_t, 2>{pb_id, pa_id};
+            string e_key = std::to_string(edge[0]) + "_" + std::to_string(edge[1]);
+            if(edge_keys.find(e_key) == edge_keys.end())
+            {
+                edge_keys.insert(e_key);
+                edges.push_back(edge);
+            }
+        }
+    }
+}
+
+
+void SaveTetMeshToPly(const vector<array<double, 3>>& vertices, 
+    const vector<array<size_t, 4>>& tets,
+   const vector<double>& values, const std::string& filename)
+{
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        std::cerr << "Error: Unable to open file for writing!\n";
+        return;
+    }
+    std::vector<std::array<size_t, 2>> edges;
+    GetTetEdges(tets, edges);
+    std::vector<std::string> v_color_strs; 
+    vector<array<double, 3>> v_pts;
+    vector<double> v_values;
+    for (int i= 0; i < vertices.size(); ++i) {
+        const auto& p = vertices[i];
+        std::string color_str = values[i] > 0 ? " 255 0 0" : " 0 0 255";
+        v_color_strs.push_back(color_str);
+        v_pts.push_back(p);
+        v_values.push_back(values[i]);
+        // outFile << p[0] << " " << p[1] << " " << p[2] << color_str << std::endl;
+    }
+    std::vector<std::array<size_t, 3>> faces;  
+    size_t p_count = vertices.size();
+    for (int i= 0; i < edges.size(); ++i) {
+        const auto& e = edges[i];
+        double px = vertices[e[0]][0] / 2.0 +  vertices[e[1]][0] / 2.0;
+        double py = vertices[e[0]][1] / 2.0 +  vertices[e[1]][1] / 2.0;
+        double pz = vertices[e[0]][2] / 2.0 +  vertices[e[1]][2] / 2.0;
+        
+        // outFile << px << " " << py << " " << pz ;
+        if(values[e[0]] * values[e[1]] <= 0)
+        {
+            double value = (values[e[0]] + values[e[1]]) /2.0;
+            v_values.push_back(value);
+            v_pts.push_back({px, py, pz});
+            std::string color_str = " 0 255 0";
+            v_color_strs.push_back(color_str);
+            faces.push_back({e[0], e[1], p_count});
+            p_count ++;
+        }
+    }
+    
+    // Write PLY header
+    outFile << "ply\n";
+    outFile << "format ascii 1.0\n";
+    outFile << "element vertex " << vertices.size() + faces.size() << "\n";
+    outFile << "property float x\n";
+    outFile << "property float y\n";
+    outFile << "property float z\n";
+    outFile << "property uchar red\n";
+    outFile << "property uchar green\n";
+    outFile << "property uchar blue\n";
+    outFile << "property float quality\n";
+    outFile << "element face " << faces.size() << "\n";
+    outFile << "property list uchar int vertex_indices\n";
+    outFile << "end_header\n";
+
+    for(size_t i = 0; i < v_pts.size(); ++i)
+    {
+        const auto& p = v_pts[i];
+        const auto& color_str = v_color_strs[i];
+        outFile << p[0] << " " << p[1] << " " << p[2] << color_str << " " << v_values[i]<< std::endl;
+    }
+    // Write vertex data
+    // Write face data
+    for (const auto &face : faces) {
+        outFile << "3 " <<  face[0] << " " << face[1] << " " << face[2] << std::endl;
+    }
+
+    outFile.close();
+    std::cout << "PLY file saved successfully: " << filename << std::endl;
+}
+
+
+void SavePointsWithQualityToPLY(const std::string& filename, 
+    const std::vector<std::array<double,3>>& points,
+    const std::vector<double>& qualtity) {
+    //  const std::vector<Point>& points, const std::vector<Edge>& edges
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error: Unable to open file " << filename << std::endl;
+        return;
+    }
+
+    // Write PLY header
+    file << "ply\n";
+    file << "format ascii 1.0\n";
+    file << "element vertex " << points.size() << "\n";
+    file << "property float x\n";
+    file << "property float y\n";
+    file << "property float z\n";
+    file << "property float quality\n";
+    file << "end_header\n";
+    // Write vertex data
+    for (int i =0; i < points.size(); ++i) {
+        const auto& point = points[i];
+        
+        file << point[0] << " " << point[1] << " " << point[2] << " " << qualtity[i] << "\n";
+    }
+
+    file.close();
+    std::cout << "PLY file saved: " << filename << std::endl;
+}
+
+
+// Save vertices and tetrahedra to text file
+bool SaveTetToFile(const std::vector<std::array<double, 3>>& vertices, 
+    const std::vector<std::array<size_t, 4>>& tet, const std::string& filename) {
+    std::ofstream outFile(filename);
+    
+    if (!outFile.is_open()) {
+        return false;
+    }
+    
+    // Write number of vertices and tetrahedra as header
+    outFile << vertices.size() << " " << tet.size() << "\n";
+    
+    // Write vertices section
+    outFile << "# Vertices\n";
+    for (const auto& vertex : vertices) {
+        outFile << vertex[0] << " " 
+                << vertex[1] << " " 
+                << vertex[2] << "\n";
+    }
+    
+    // Write tetrahedra section
+    outFile << "# Tetrahedra\n";
+    for (const auto& tetra : tet) {
+        outFile << tetra[0] << " " 
+                << tetra[1] << " " 
+                << tetra[2] << " " 
+                << tetra[3] << "\n";
+    }
+    
+    outFile.close();
+    return true;
+}
+
+// Read vertices and tetrahedra from text file
+bool ReadTetFromFile(std::vector<std::array<double, 3>>& vertices, 
+    std::vector<std::array<size_t, 4>>& tet, const std::string& filename) {
+    std::ifstream inFile(filename);
+    
+    if (!inFile.is_open()) {
+        return false;
+    }
+    
+    // Clear existing data
+    vertices.clear();
+    tet.clear();
+    
+    std::string line;
+    
+    // Read header
+    size_t numVertices, numTet;
+    if (!std::getline(inFile, line)) {
+        inFile.close();
+        return false;
+    }
+    std::istringstream header(line);
+    if (!(header >> numVertices >> numTet)) {
+        inFile.close();
+        throw std::runtime_error("Invalid header format");
+    }
+    
+    // Read vertices section
+    while (std::getline(inFile, line) && line != "# Tetrahedra") {
+        if (line.empty() || line[0] == '#') continue;
+        
+        std::array<double, 3> vertex;
+        std::istringstream iss(line);
+        if (!(iss >> vertex[0] >> vertex[1] >> vertex[2])) {
+            inFile.close();
+            throw std::runtime_error("Invalid vertex format");
+        }
+        vertices.push_back(vertex);
+    }
+    
+    // Read tetrahedra section
+    while (std::getline(inFile, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        
+        std::array<size_t, 4> tetra;
+        std::istringstream iss(line);
+        if (!(iss >> tetra[0] >> tetra[1] >> tetra[2] >> tetra[3])) {
+            inFile.close();
+            throw std::runtime_error("Invalid tetrahedron format");
+        }
+        tet.push_back(tetra);
+    }
+    
+    // Verify counts match header
+    if (vertices.size() != numVertices || tet.size() != numTet) {
+        inFile.close();
+        throw std::runtime_error("Data counts don't match header");
+    }
+    
+    inFile.close();
+    return true;
 }

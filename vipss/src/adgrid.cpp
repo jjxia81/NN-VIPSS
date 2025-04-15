@@ -17,6 +17,7 @@
 #include <adgrid/timer.h>
 #include <adgrid/grid_mesh.h>
 #include <nlohmann/json.hpp>
+#include "marching3D.h"
 
 using json = nlohmann::json;
 using namespace mtet;
@@ -54,6 +55,30 @@ bool save_mesh_json(const std::string& filename,
     return true;
 }
 
+bool get_mesh_data(const mtet::MTetMesh& mesh, 
+                    vector<array<double, 3>>& vertices, 
+                    vector<array<size_t, 4>>& tets)
+{
+    vertices.resize((int)mesh.get_num_vertices());
+    tets.resize((int)mesh.get_num_tets());
+    using IndexMap = ankerl::unordered_dense::map<uint64_t, size_t>;
+    IndexMap vertex_tag_map;
+    vertex_tag_map.reserve(mesh.get_num_vertices());
+    int counter = 0;
+    mesh.seq_foreach_vertex([&](VertexId vid, std::span<const Scalar, 3> data){
+        size_t vertex_tag = vertex_tag_map.size() + 1;
+        vertex_tag_map[value_of(vid)] = vertex_tag;
+        vertices[counter] = {data[0], data[1], data[2]};
+        counter ++;
+    });
+    counter = 0;
+    mesh.seq_foreach_tet([&](TetId, std::span<const VertexId, 4> data) {
+        tets[counter] = {vertex_tag_map[value_of(data[0])] - 1, vertex_tag_map[value_of(data[1])] - 1, vertex_tag_map[value_of(data[2])] - 1, vertex_tag_map[value_of(data[3])] - 1};
+        counter ++;
+    });
+    return true;
+}
+
 bool save_function_json(const std::string& filename,
                         const mtet::MTetMesh mesh,
                         ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<std::array<double, 4>, 20>> vertex_func_grad_map,
@@ -87,6 +112,34 @@ bool save_function_json(const std::string& filename,
     fout.close();
     return true;
 }
+
+bool get_function_val_and_gradients(const mtet::MTetMesh& mesh,
+                        ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<std::array<double, 4>, 20>>& vertex_func_grad_map,
+                        vector<double>& values,
+                        vector<std::array<double, 3>>& gradients)
+{
+    values.resize((int)mesh.get_num_vertices());
+    gradients.resize((int)mesh.get_num_vertices());
+    std::cout << "mesh vertices size " << (int)mesh.get_num_vertices() << std::endl;
+    std::cout << " vertex_func_grad_map size " << vertex_func_grad_map.size() << std::endl;
+    int counter = 0;
+    mesh.seq_foreach_vertex([&](VertexId vid, std::span<const Scalar, 3> data){
+        llvm_vecsmall::SmallVector<std::array<double, 4>, 20> func_gradList(1);
+        size_t id = value_of(vid); 
+        func_gradList = vertex_func_grad_map[id];
+        size_t funcId = 0;
+        // std::cout << func_gradList[funcId][0] << std::endl;
+        // std::cout << " v id " << id << std::endl;
+        values[counter] = func_gradList[funcId][0];
+        gradients[counter][0] = func_gradList[funcId][1];
+        gradients[counter][1] = func_gradList[funcId][2];
+        gradients[counter][2] = func_gradList[funcId][3];
+        counter ++;    
+    });
+    
+    return true;
+}
+
 //hash for mounting a boolean that represents the activeness to a tet
 //since the tetid isn't const during the process, mount the boolean using vertexids of 4 corners.
 uint64_t vertexHash(std::span<VertexId, 4>& x)
@@ -101,7 +154,9 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
                              const std::string& outdir,
                              const std::string& filename,
                              std::vector<shared_ptr<ImplicitFunction<double>>>& functions,
-                             double in_threshold)
+                             double in_threshold,
+                             std::vector<std::array<double, 3> >& output_vertices,
+                            std::vector<std::array<size_t, 3> >& output_triangles)
 {
     struct
     {
@@ -163,14 +218,22 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
 
     std::cout << " adgrid min bbox :  " << expand_bbox_min[0] << " " << expand_bbox_min[1] << " " << expand_bbox_min[2] << std::endl;
     std::cout << " adgrid max bbox :  " << expand_bbox_max[0] << " " << expand_bbox_max[1] << " " << expand_bbox_max[2] << std::endl;
-
-
+    
+    double new_dx = expand_bbox_max[0] - expand_bbox_min[0];
+    double new_dy = expand_bbox_max[1] - expand_bbox_min[1];
+    double new_dz = expand_bbox_max[2] - expand_bbox_min[2];
+    double d_step = std::max(std::max(new_dx, new_dy), new_dz) / 10.0;
+    int x_dim = max(int(new_dx / d_step + 0.5), 1);
+    int y_dim = max(int(new_dy / d_step + 0.5), 1);
+    int z_dim = max(int(new_dz / d_step + 0.5), 1);
+    
     // double voxel_len = max_len / double(vol_dim);
     // int dimx = std::max(int(dx / voxel_len), 1);
     // int dimy = std::max(int(dy / voxel_len), 1);
     // int dimz = std::max(int(dz / voxel_len), 1);
 
     std::array<size_t, 3> new_resolution = {3, 3, 3};
+    // std::array<size_t, 3> new_resolution = {x_dim, y_dim, z_dim};
 
     mtet::MTetMesh mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
     // mtet::MTetMesh mesh;
@@ -642,14 +705,53 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
 
     str_th.erase(str_th.find_last_not_of('0') + 1, std::string::npos);
     
-
-    save_timings(outfile + "_timings_" + str_th + ".json",time_label, profileTimer);
+    // save_timings(outfile + "_timings_" + str_th + ".json",time_label, profileTimer);
     // save statistics
-    save_metrics(outfile + "_stats_"  + str_th +".json", tet_metric_labels, {(double)mesh.get_num_tets(), activeTet, min_rratio_all, min_rratio_active, (double)sub_call_two, (double) sub_call_three});
+    // save_metrics(outfile + "_stats_"  + str_th +".json", tet_metric_labels, {(double)mesh.get_num_tets(), activeTet, min_rratio_all, min_rratio_active, (double)sub_call_two, (double) sub_call_three});
     // save the mesh output for isosurfacing tool
-    save_mesh_json(outfile + "_mesh_" + str_th + ".json", mesh);
+    // save_mesh_json(outfile + "_mesh_" + str_th + ".json", mesh);
     // save the mesh output for isosurfacing tool
-    save_function_json(outfile + "_function_value_" + str_th + ".json", mesh, vertex_func_grad_map, funcNum);
+    // save_function_json(outfile + "_function_value_" + str_th + ".json", mesh, vertex_func_grad_map, funcNum);
+    vector<array<double, 3>> vertices;
+    vector<array<size_t, 4>> tets;
+    
+    // std::string input_tet_path = "/home/jjxia/Documents/prejects/VIPSS_LOCAL/output/kitten/kitten_2000_tet_tet_data.txt";
+    // ReadTetFromFile(vertices, tets, input_tet_path);
+    get_mesh_data(mesh, vertices, tets);
+
+    std::cout << "vertices size " << vertices.size() << std::endl;
+    std::cout << "tets size " << tets.size() << std::endl;
+
+    vector<double> values;
+    vector<std::array<double, 3>> gradients;
+    get_function_val_and_gradients(mesh, vertex_func_grad_map, values, gradients);
+    // values.resize(vertices.size());
+    // gradients.resize(vertices.size());
+    // size_t v_count = 0;
+    // for(const auto& pt : vertices)
+    // {
+    //     // std::array<double, 3> gradient;       
+    //     // double gradient[3];
+    //     // double dist_val = LocalVipss::NNDistGradient({pt[0], pt[1], pt[2]}, gradient);
+    //     double dist_val = LocalVipss::NNDistFunction({pt[0], pt[1], pt[2]});
+    //     std::array<double, 3> gradient   = LocalVipss::NumericGradientFunction({pt[0], pt[1], pt[2]});
+    //     values[v_count] = dist_val;
+    //     gradients[v_count] = {gradient[0], gradient[1], gradient[2]};
+    //     v_count ++;
+    // }
+    
+    std::cout << " val size " <<  values.size() << std::endl;
+    std::cout << " gradients size " <<  gradients.size() << std::endl;
+    std::cout << " vertices size " <<  vertices.size() << std::endl;
+
+    marching3D::MarchingTet3D( vertices, tets, values, gradients, output_vertices, output_triangles);
+
+    // std::string tet_edge_path = outfile + "_tet_edges.ply";
+    // SaveTetMeshToPly(vertices, tets, values, tet_edge_path);
+    
+    // std::string tet_path = outfile + "_tet_data.txt";
+    // SaveTetToFile(vertices, tets, tet_path);
+
     // //write mesh and active tets
     // std::cout << "save tet mesh path : " << outfile + "_tet_mesh_" + str_th + ".msh" << std::endl;
     // mtet::save_mesh(outfile + "_tet_mesh_" + str_th + ".msh", mesh);

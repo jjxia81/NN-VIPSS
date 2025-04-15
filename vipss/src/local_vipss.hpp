@@ -73,6 +73,8 @@ class LocalVipss {
         inline bool IsFlipNormal(const arma::mat& a_normals, const arma::mat& b_normals) const;
         inline bool FlipClusterNormal(size_t c_a, size_t c_b) const;
         inline bool FlipClusterNormalSimple(size_t c_a, size_t c_b) const;
+        inline bool FlipClusterNormalSimple2(size_t c_a, size_t c_b) const;
+        inline bool FlipClusterNormal2(size_t c_a, size_t c_b) const;
         void BuildClusterMST(bool use_distance_weight);
         void FlipClusterNormalsByMST();
         void WriteVipssTimeLog();
@@ -106,7 +108,10 @@ class LocalVipss {
         // double NodeDistanceFunction(const tetgenmesh::point nn_pt, const tetgenmesh::point cur_pt) const;
         double NatureNeighborDistanceFunctionOMP(const tetgenmesh::point cur_pt) const;
         double NatureNeighborGradientOMP(const tetgenmesh::point cur_pt,double* gradient) const;
+        arma::mat NNHRBFHessianOMP(const tetgenmesh::point cur_pt) const;
         static double NNDistFunction(const R3Pt &in_pt);  
+        static std::array<double,3> NumericGradientFunction(const R3Pt &in_pt); 
+
         // double NNDistFunction(const double* in_pt);
         static double NNDistGradient(const R3Pt &in_pt, double* gradient); 
         void SetThis();      
@@ -179,6 +184,7 @@ class LocalVipss {
         size_t pt_num_;
         // std::vector<std::pair<int, double>> cluster_id_scores_;
         // std::set<size_t> update_score_cluster_ids_;
+        std::vector<double> input_normals_;
         std::vector<double> out_pts_;
         std::vector<double> out_normals_;
         std::vector<double> out_normals_dist_;
@@ -238,4 +244,5 @@ class LocalVipss {
         double tet_build_adj_mat_time_;
         double dummy_sign_ = 0;
         int min_batch_size_ = 10000;
+        bool input_has_normal_ = true;
 };

@@ -35,7 +35,11 @@ void VIPSSUnit::InitPtNormalWithLocalVipss()
     auto t1 = Clock::now();
     // local_vipss_.volume_dim_ = 100;
     local_vipss_.Init(input_data_path_, input_data_ext_);
-    local_vipss_.InitNormals();
+    if(!use_input_normal_)
+    {
+        local_vipss_.InitNormals();
+    }
+    
     auto t2 = Clock::now();
     G_VP_stats.init_normal_total_time_ = std::chrono::nanoseconds(t2 - t1).count() / 1e9;
     G_VP_stats.tetgen_triangulation_time_ = local_vipss_.tet_gen_triangulation_time_;
@@ -579,44 +583,30 @@ void VIPSSUnit::BuildNNHRBFFunctions()
     local_vipss_.voro_gen_.insert_boundary_pts_.clear();
     auto t001 = Clock::now();
     G_VP_stats.generate_voro_data_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;
-    // G_VP_stats.generate_voro_data_time_ = generate_voro_data_time
-    // auto t002 = Clock::now();
-    // double generate_voro_data_time = std::chrono::nanoseconds(t002 - t001).count() / 1e9;
+
     local_vipss_.out_normals_ = newnormals_;
     local_vipss_.s_vals_ = s_func_vals_;
     local_vipss_.user_lambda_ = user_lambda_;
-
     std::cout << "--- input user lambda val " << user_lambda_ << std::endl;
-    if(only_use_nn_hrbf_surface_)
-    {
-        std::vector<double> in_pts;
-        std::vector<double> in_normals;
-        readXYZnormal(input_data_path_, in_pts, in_normals);
-        std::cout << "--- input normal size " << in_normals.size() / 3 << std::endl;
-        newnormals_ = in_normals;
-        local_vipss_.out_normals_ = in_normals;
-        s_func_vals_.resize(in_normals.size()/3, 0);
-
-        // std::string vipss_s_val_path = "/home/jjxia/Documents/prejects/VIPSS/vipss/build/s_val_walrus.txt";
-        // s_func_vals_ = ReadVectorFromFile(vipss_s_val_path);
-        local_vipss_.s_vals_ = s_func_vals_;
-
-        std::cout << "input func svals size : " << local_vipss_.s_vals_.size() << std::endl;
-    }
-
-    // for(int i = 0; i < 9 ; ++i)
+    // if(only_use_nn_hrbf_surface_)
     // {
-    //     // std::cout << v_pts[i] * 2<< " " << local_vipss_.out_pts_[i] << std::endl;
-    //     std::cout << "v_normals " << local_vipss_.out_normals_[i] << std::endl;
+    //     std::vector<double> in_pts;
+    //     std::vector<double> in_normals;
+    //     readXYZnormal(input_data_path_, in_pts, in_normals);
+    //     std::cout << "--- input normal size " << in_normals.size() / 3 << std::endl;
+    //     newnormals_ = in_normals;
+    //     local_vipss_.out_normals_ = in_normals;
+    //     s_func_vals_.resize(in_normals.size()/3, 0);
+
+    //     // std::string vipss_s_val_path = "/home/jjxia/Documents/prejects/VIPSS/vipss/build/s_val_walrus.txt";
+    //     // s_func_vals_ = ReadVectorFromFile(vipss_s_val_path);
+    //     local_vipss_.s_vals_ = s_func_vals_;
+    //     std::cout << "input func svals size : " << local_vipss_.s_vals_.size() << std::endl;
     // }
-    
-    newnormals_.clear();
-    // s_func_vals_.clear();
+    // newnormals_.clear();
     local_vipss_.BuildHRBFPerNode();
     local_vipss_.SetThis(); 
-    // local_vipss_.dummy_sign_ = LocalVipss::NNDistFunction(R3Pt(local_vipss_.voro_gen_.dummy_sign_pt_[0],
-    //                                                            local_vipss_.voro_gen_.dummy_sign_pt_[1], 
-    //                                                            local_vipss_.voro_gen_.dummy_sign_pt_[2]));    
+    
     if(abs(local_vipss_.dummy_sign_ ) > 1e-18)
     {
         local_vipss_.dummy_sign_ = local_vipss_.dummy_sign_ / abs(local_vipss_.dummy_sign_);
@@ -806,6 +796,27 @@ void VIPSSUnit::ReconSurface()
 }
 
 
+void VIPSSUnit::ReconSurfaceHRBF(std::shared_ptr<RBF_Core> HRBF_ptr)
+{
+    printf(" start ReconSurface \n");
+    if(LOCAL_HRBF_NN == hrbf_type_)
+    {
+        auto t000 = Clock::now();
+        size_t n_voxels_1d = volume_dim_;
+        std::cout << "pt size " << local_vipss_.out_pts_.size() << std::endl;
+        Surfacer sf;
+        HRBF_ptr->SetThis();
+        auto surf_time = sf.Surfacing_Implicit(HRBF_ptr->pts, n_voxels_1d, false, RBF_Core::Dist_Function);
+        auto t004 = Clock::now();
+        sf.WriteSurface(finalMesh_v_,finalMesh_fv_);
+        auto t005 = Clock::now();
+        // double surface_file_save_time = std::chrono::nanoseconds(t005 - t004).count() / 1e9;
+        // double total_surface_time = std::chrono::nanoseconds(t004 - t000).count() / 1e9;
+        writePLYFile_VF(out_surface_path_, finalMesh_v_, finalMesh_fv_);
+    } 
+}
+
+
 void VIPSSUnit::GenerateAdaptiveGrid()
 {
     
@@ -849,50 +860,99 @@ void VIPSSUnit::GenerateAdaptiveGrid()
         std::cout << " s_func_vals_ size " << s_func_vals_.size() << std::endl;
 
         local_vipss_.vipss_api_.build_cluster_hrbf(in_pts, local_vipss_.out_normals_, s_func_vals_, g_hrbf);
+        std::vector<std::array<double, 3> > output_vertices;
+        std::vector<std::array<size_t, 3> > output_triangles;
+        AdaptiveGridHRBF(g_hrbf, output_vertices, output_triangles);
 
-        // CompareMeshDiff(g_hrbf);
-        // std::cout << " Finish build_cluster_hrbf  " << std::endl;
-
-        std::cout << "local_vipss_.out_pts_ size " << local_vipss_.out_pts_.size()/3 << std::endl;
-
-        std::vector<Vec3> in_points(local_vipss_.out_pts_.size()/3);
-        for(int i = 0; i < local_vipss_.out_pts_.size()/3; ++i)
-        {
-            in_points[i] =  {local_vipss_.out_pts_[3*i], local_vipss_.out_pts_[3*i +1], local_vipss_.out_pts_[3*i +2]};
-        }
-
-        Eigen::VectorXd hrbf_a;
-        hrbf_a.resize(g_hrbf->a.size());
-
-        std::cout << " g_hrbf->a.size() " << g_hrbf->a.size() << std::endl;
-        for(int i = 0; i < g_hrbf->a.size(); ++i)
-        {
-            hrbf_a[i] = g_hrbf->a[i];
-        }
-        Vec4 hrbf_b;
-        for(int i =0; i < 4; ++i)
-        {
-            hrbf_b[i] = g_hrbf->b[i];
-        }
-        std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<Hermite_RBF<double>>(in_points, hrbf_a, hrbf_b, iso_offset_val_);
-        functions.push_back(hrbf_func);
-        auto g_t1 = Clock::now();
-        G_VP_stats.hrbf_coefficient_time_ = std::chrono::nanoseconds(g_t1 - g_t0).count() / 1e9;
-        
     } else {
         std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<HRBFDistanceFunction>(iso_offset_val_);
         // hrbf_func->SetIsoOffset(iso_offset_val_);
         functions.push_back(hrbf_func);
+        auto t000 = Clock::now();   
+        std::vector<std::array<double, 3> > output_vertices;
+        std::vector<std::array<size_t, 3> > output_triangles;
+        GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
+                                local_vipss_.voro_gen_.bbox_max_, out_dir_,  
+                                file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
+        auto t001 = Clock::now();
+
+        for(auto& pt : output_vertices)
+        {
+            pt[0] = pt[0] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[0];
+            pt[1] = pt[1] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[1];
+            pt[2] = pt[2] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[2];
+        }
+        
+        SaveMeshToPly(out_surface_path_, output_vertices, output_triangles);
+        G_VP_stats.adgrid_gen_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;
+
+        printf("adaptive grid generation time : %f ! \n", G_VP_stats.adgrid_gen_time_);
     }
 
-    auto t000 = Clock::now();   
-    GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
-                            local_vipss_.voro_gen_.bbox_max_, out_dir_,  
-                            file_name_,  functions, adgrid_threshold_);
+    
+}
+
+void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf, 
+                    std::vector<std::array<double, 3> >& output_vertices,
+                    std::vector<std::array<size_t, 3> >& output_triangles)
+{
+    std::array<size_t,3> resolution = {3, 3, 3};
+    std::vector<shared_ptr<ImplicitFunction<double>>> functions;
+    using Vec3 = Eigen::Matrix<double, 3, 1>;
+    using Vec4 = Eigen::Matrix<double, 4, 1>;
+
+    double min_x = std::numeric_limits<double>::max();
+    double min_y = std::numeric_limits<double>::max();
+    double min_z = std::numeric_limits<double>::max();
+
+    double max_x = std::numeric_limits<double>::lowest();
+    double max_y = std::numeric_limits<double>::lowest();
+    double max_z = std::numeric_limits<double>::lowest();
+
+    std::vector<Vec3> in_points(g_hrbf->pts.size()/3);
+    for(int i = 0; i < g_hrbf->pts.size()/3; ++i)
+    {
+        in_points[i] =  {g_hrbf->pts[3*i], g_hrbf->pts[3*i +1], g_hrbf->pts[3*i +2]};
+        min_x = min_x < g_hrbf->pts[3*i]     ? min_x : g_hrbf->pts[3*i];
+        min_y = min_y < g_hrbf->pts[3*i + 1] ? min_y : g_hrbf->pts[3*i + 1];
+        min_z = min_z < g_hrbf->pts[3*i + 2] ? min_z : g_hrbf->pts[3*i + 2];
+
+        max_x = max_x > g_hrbf->pts[3*i]     ? max_x : g_hrbf->pts[3*i];
+        max_y = max_y > g_hrbf->pts[3*i + 1] ? max_y : g_hrbf->pts[3*i + 1];
+        max_z = max_z > g_hrbf->pts[3*i + 2] ? max_z : g_hrbf->pts[3*i + 2];
+    }
+
+    std::array<double,3> bbox_min = {min_x, min_y, min_z};
+    std::array<double,3> bbox_max = {max_x, max_y, max_z};
+
+    Eigen::VectorXd hrbf_a;
+    hrbf_a.resize(g_hrbf->a.size());
+
+    std::cout << " g_hrbf->a.size() " << g_hrbf->a.size() << std::endl;
+    for(int i = 0; i < g_hrbf->a.size(); ++i)
+    {
+        hrbf_a[i] = g_hrbf->a[i];
+    }
+    Vec4 hrbf_b;
+    for(int i =0; i < 4; ++i)
+    {
+        hrbf_b[i] = g_hrbf->b[i];
+    }
+    std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<Hermite_RBF<double>>(in_points, hrbf_a, hrbf_b, iso_offset_val_);
+    functions.push_back(hrbf_func);
+    auto g_t1 = Clock::now();
+    auto t000 = Clock::now();
+
+    
+      
+    GenerateAdaptiveGridOut(resolution, bbox_min, bbox_max, out_dir_,  
+                            file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
+    
     auto t001 = Clock::now();
     G_VP_stats.adgrid_gen_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;
 
     printf("adaptive grid generation time : %f ! \n", G_VP_stats.adgrid_gen_time_);
+
 }
 
 void VIPSSUnit::SolveOptimizaiton()
@@ -964,13 +1024,91 @@ void VIPSSUnit::Run()
     auto t00 = Clock::now();
     rbf_api_.Set_RBF_PARA();
     InitPtNormalWithLocalVipss();
+
+    bool out_init_normal = true;
+    if(out_init_normal)
+    {
+        std::string out_init_normal_path = out_dir_ + + "/" + file_name_ + "_init_normal.ply";
+        std::vector<double> init_out_pts(local_vipss_.out_pts_.size(), 0);
+        for(int i = 0; i < local_vipss_.out_pts_.size()/3; ++i)
+        {
+            init_out_pts[3*i] = local_vipss_.out_pts_[3*i] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[0];
+            init_out_pts[3*i + 1] = local_vipss_.out_pts_[3*i + 1] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[1];
+            init_out_pts[3*i + 2] = local_vipss_.out_pts_[3*i + 2] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[2];
+        }
+        writePLYFile_VN(out_init_normal_path, init_out_pts, local_vipss_.out_normals_);
+    }
     
-    std::string out_init_normal_path = out_dir_ + + "/" + file_name_ + "_init_normal.ply";
-    writePLYFile_VN(out_init_normal_path, local_vipss_.out_pts_, local_vipss_.out_normals_);
+    std::vector<double> singular_pts;
+    for(auto& pt : local_vipss_.voro_gen_.singular_pts_)
+    {
+        double x =  pt[0] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[0];
+        double y =  pt[1] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[1];
+        double z =  pt[2] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[2];
+        singular_pts.push_back(x);
+        singular_pts.push_back(y);
+        singular_pts.push_back(z);
+    }
+    if(singular_pts.size() > 0)
+    {
+        std::string out_strange_pts_path = out_dir_ + + "/" + file_name_ + "_strange_points.xyz";
+        writeXYZ(out_strange_pts_path, singular_pts);
+    }
+    
 
     if(! only_use_nn_hrbf_surface_ )
     {
         SolveOptimizaiton();
+    }
+    if(! only_use_nn_hrbf_surface_)
+    {   
+        // std::vector<tetgenmesh::point> hull_pts;
+        // local_vipss_.voro_gen_.tetMesh_.outhullPts(&(local_vipss_.voro_gen_.tetIO_), hull_pts);
+        std::vector<double> out_hull_pts;
+        arma::vec3 hull_c= {0, 0, 0};   
+        std::vector<arma::vec3> hull_normals;
+        int normal_size = newnormals_.size();
+        std::cout << " newnormals_ size 00 " << normal_size << std::endl;
+        for(auto pt: local_vipss_.voro_gen_.convex_hull_pts_)
+        {
+            hull_c[0] += pt[0];
+            hull_c[1] += pt[1];
+            hull_c[2] += pt[2];
+            size_t pid = local_vipss_.voro_gen_.point_id_map_[pt];
+            hull_normals.push_back({newnormals_[3* pid], newnormals_[3* pid + 1], newnormals_[3* pid+ 2]});
+        }
+        if(! local_vipss_.voro_gen_.convex_hull_pts_.empty())
+        {
+            hull_c = hull_c / double(local_vipss_.voro_gen_.convex_hull_pts_.size());
+        }
+        double sign_sum = 0;
+        for(int i = 0; i < local_vipss_.voro_gen_.convex_hull_pts_.size(); ++i)
+        {
+            const auto& pt = local_vipss_.voro_gen_.convex_hull_pts_[i];
+            arma::vec3 diff = {pt[0] - hull_c[0], pt[1] - hull_c[1], pt[2] - hull_c[2]};
+            sign_sum += arma::dot(diff, hull_normals[i]); 
+        }
+        std::cout << " sign_sum value " << sign_sum << std::endl;
+        // auto out_normals  = newnormals_;
+        std::cout << " newnormals_ size " <<(int) newnormals_.size() << std::endl;
+        if(sign_sum < 0)
+        {
+            for( auto& ele : newnormals_)
+            {
+                ele *= -1.0;
+            }
+        }
+        // std::string hull_pt_path = "convex_hull_pts.xyz";
+        // writeXYZ(hull_pt_path, out_hull_pts);
+        std::vector<double> out_pts(local_vipss_.out_pts_.size(), 0);
+        for(int i = 0; i < local_vipss_.out_pts_.size()/3; ++i)
+        {
+            out_pts[3*i] = local_vipss_.out_pts_[3*i] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[0];
+            out_pts[3*i + 1] = local_vipss_.out_pts_[3*i + 1] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[1];
+            out_pts[3*i + 2] = local_vipss_.out_pts_[3*i + 2] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[2];
+        }
+        writePLYFile_VN(out_normal_path_, out_pts, newnormals_);
+        std::cout << " save estimated normal to file : " << out_normal_path_ << std::endl;
     }
     
     if (is_surfacing_)
@@ -979,21 +1117,21 @@ void VIPSSUnit::Run()
         {   
             // std::string vipss_pt_path = "../../data/torus/torus_two_parts_normal.ply";
             std::string vipss_pt_path = input_data_path_;
-            std::vector<double> v_pts;
-            std::vector<double> v_normals;
+            // std::vector<double> v_pts;
+            // std::vector<double> v_normals;
             // readPLYFile(vipss_pt_path, v_pts, v_normals);
-            readXYZnormal(vipss_pt_path, v_pts, v_normals);
-            local_vipss_.out_normals_ = v_normals;
+            // readXYZnormal(vipss_pt_path, v_pts, v_normals);
+            local_vipss_.out_normals_ = local_vipss_.input_normals_;
             // std::vector<double> s_vals = ReadVectorFromFile(vipss_s_val_path);
-            std::vector<double> s_vals(v_pts.size()/3, 0);
+            std::vector<double> s_vals(local_vipss_.out_normals_.size()/3, 0);
             local_vipss_.s_vals_ = s_vals;
-            newnormals_ = v_normals;
+            newnormals_ = local_vipss_.out_normals_;
             s_func_vals_ = s_vals;
-            for(int i = 0; i < 9 ; ++i)
-            {
-                std::cout << v_pts[i] * 2<< " " << local_vipss_.out_pts_[i] << std::endl;
-                std::cout << "v_normals " << v_normals[i] << std::endl;
-            }
+            // for(int i = 0; i < 9 ; ++i)
+            // {
+            //     std::cout << v_pts[i] * 2<< " " << local_vipss_.out_pts_[i] << std::endl;
+            //     std::cout << "v_normals " << v_normals[i] << std::endl;
+            // }
             // local_vipss_.out_pts_ = v_pts;
         }
         BuildNNHRBFFunctions();
@@ -1031,16 +1169,12 @@ void VIPSSUnit::Run()
     double total_time = std::chrono::nanoseconds(t01 - t00).count()/1e9;
     printf("total local vipss running time : %f ! \n", total_time);
     // std::string out_path  = local_vipss_.out_dir_ + local_vipss_.filename_  + "_opt";
-    if(! only_use_nn_hrbf_surface_)
-    {   
-        writePLYFile_VN(out_normal_path_, local_vipss_.out_pts_, newnormals_);
-        std::cout << " save estimated normal to file : " << out_normal_path_ << std::endl;
-    }
+    
     
     newnormals_.clear();
     // local_vipss_.out_pts_.clear();
     local_vipss_.voro_gen_.vcell_face_centers_.clear();
-   
+    // GenerateGridPts();
 
     // is_surfacing_ = false;
     if (is_surfacing_)
@@ -1060,11 +1194,112 @@ void VIPSSUnit::Run()
     }
     // test_vipss_timing::test_local_vipss(input_data_path_);
     // test_vipss_timing::visual_distval_pt(input_data_path_, 200);
-    std::string out_csv_file = out_dir_ + file_name_ + "_time_stats_" + std::to_string(user_lambda_) + " .txt";
-    WriteStatsTimeCSV(out_csv_file, G_VP_stats);
+    // std::string out_csv_file = out_dir_ + file_name_ + "_time_stats_" + std::to_string(user_lambda_) + " .txt";
+    // WriteStatsTimeCSV(out_csv_file, G_VP_stats);
 
-    std::string out_csv_re_file = out_dir_ + file_name_ + "_res.txt";
-    WriteVectorValsToCSV(out_csv_re_file, G_VP_stats.residuals_);
+    // std::string out_csv_re_file = out_dir_ + file_name_ + "_res.txt";
+    // WriteVectorValsToCSV(out_csv_re_file, G_VP_stats.residuals_);
+}
+
+void VIPSSUnit::RunRidgesGHRBF()
+{
+    std::vector<double> pts;
+    readXYZ(input_data_path_, pts);
+    std::cout << " read input pts size :  " << pts.size() / 3 << std::endl;
+    std::shared_ptr<RBF_Core> rfb_ptr = std::make_shared<RBF_Core>();
+    BuildGlobalHRBFVipss(pts, rfb_ptr, user_lambda_);
+    // adgrid_threshold_ = 0.005;
+    std::vector<std::array<double, 3> > output_vertices;
+    std::vector<std::array<size_t, 3> > output_triangles;
+    // ReconSurfaceHRBF(rfb_ptr);
+    // size_t v_num = finalMesh_v_.size()/3;
+    // output_vertices.resize(v_num);
+    // for(int i = 0; i < v_num; ++i)
+    // {
+    //     output_vertices[i] = {finalMesh_v_[3*i], finalMesh_v_[3*i + 1], finalMesh_v_[3*i + 2]};
+    // }
+    // size_t f_num = finalMesh_fv_.size()/3;
+    // output_triangles.resize(f_num);
+    // for(int i = 0; i < f_num; ++i)
+    // {
+    //     output_triangles[i] = {finalMesh_fv_[3*i],  finalMesh_fv_[3*i + 1], finalMesh_fv_[3*i + 2] };
+    // }
+    AdaptiveGridHRBF(rfb_ptr, output_vertices, output_triangles);
+    auto tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh" + std::to_string(user_lambda_)+".ply";
+    SaveMeshToPly(tet_mesh_path, output_vertices, output_triangles);
+    // return;
+    
+    vipss_ridges_.out_dir_ = out_dir_;
+    vipss_ridges_.file_name_ = file_name_;
+    vipss_ridges_.user_lambda_ = user_lambda_;
+    // vipss_ridges_.LoadMeshPly(ridge_mesh_path_);
+    vipss_ridges_.mesh_points_ = output_vertices;
+    vipss_ridges_.mesh_faces_ = output_triangles;
+    std::string ball_mesh_path = "/home/jjxia/Documents/prejects/VIPSS_LOCAL/data/arche/sphere_mesh_3.ply";
+    readPlyMesh(ball_mesh_path, vipss_ridges_.ball_pts_, vipss_ridges_.ball_faces_);
+    vipss_ridges_.CalMeshPointsGradientAndEigenVecs(rfb_ptr);
+    vipss_ridges_.CalculateRidgeEdgesFromMesh();
+
+    ridge_edges_save_path_ = out_dir_ + "/" + file_name_ + "_out_ridges_l" + std::to_string(user_lambda_)+  ".obj";
+    vipss_ridges_.SaveRidgesToObj(ridge_edges_save_path_);
+    ridge_edges_save_path_ = out_dir_ + "/" + file_name_ + "_out_ridges_l" + std::to_string(user_lambda_)+  "_color.ply";
+    vipss_ridges_.SaveRidgesWithColorToPLY(ridge_edges_save_path_);
+    ridge_edges_save_path_ = out_dir_ + "/" + file_name_ + "_out_ridges_l" + std::to_string(user_lambda_)+  "_quality_ratio.ply";
+    vipss_ridges_.SaveRidgesWithQualityToPLY(ridge_edges_save_path_, vipss_ridges_.edge_eig_val_ratios_);
+    ridge_edges_save_path_ = out_dir_ + "/" + file_name_ + "_out_ridges_l" + std::to_string(user_lambda_)+  "_quality_maxabs.ply";
+    vipss_ridges_.SaveRidgesWithQualityToPLY(ridge_edges_save_path_, vipss_ridges_.edge_eig_abs_vals_);
+    // std::string obj_1 = out_dir_ + "/" + file_name_ + "_ridges_l" + std::to_string(user_lambda_)+  "_m.obj";
+    // std::string obj_2 = out_dir_ + "/" + file_name_ + "_ridges_l" + std::to_string(user_lambda_)+  "_m.mtl";
+    // vipss_ridges_.SaveRidgesWithColorToObj(obj_1, obj_2);
+    // auto mesh_quality_path = out_dir_ + "/" + file_name_ + "_mesh_quality_l" + std::to_string(user_lambda_)+".ply";
+    // vipss_ridges_.SaveMeshWithPointQuality(mesh_quality_path);
+
+    std::string out_eig_ball_path = out_dir_ + "/" + file_name_ + "_eig_balls_l" + std::to_string(user_lambda_)+".ply";
+    vipss_ridges_.SaveEigBallsMesh(out_eig_ball_path);
+    
+
+    // auto t000 = Clock::now();   
+    // GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
+    //                         local_vipss_.voro_gen_.bbox_max_, out_dir_,  
+    //                         file_name_,  functions, adgrid_threshold_);
+    // auto t001 = Clock::now();
+    // G_VP_stats.adgrid_gen_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;
+
+    // printf("adaptive grid generation time : %f ! \n", G_VP_stats.adgrid_gen_time_);
+    // vipss_ridges_.CalEdgePointQuality(&local_vipss_);
+    // auto new_ridge_path = out_dir_ + "/" + file_name_ + "_out_ridges_quality.ply";
+    // vipss_ridges_.SaveRidgesToPLY(new_ridge_path);
+
+}
+
+void VIPSSUnit::RunRidges()
+{
+    local_vipss_.out_dir_ = data_dir_ + "/" + file_name_ + "/";
+    auto t00 = Clock::now();
+    rbf_api_.Set_RBF_PARA();
+    InitPtNormalWithLocalVipss();
+    SolveOptimizaiton();
+    BuildNNHRBFFunctions();
+    newnormals_.clear();
+    vipss_ridges_.SetDataCenterAndScale(local_vipss_.in_pt_center_, local_vipss_.in_pt_scale_);
+    vipss_ridges_.out_dir_ = out_dir_;
+    vipss_ridges_.file_name_ = file_name_;
+    local_vipss_.voro_gen_.vcell_face_centers_.clear();
+    vipss_ridges_.LoadMeshPly(ridge_mesh_path_);
+    std::cout << " start to CalMeshPointsGradientAndEigenVecs " << std::endl;
+    vipss_ridges_.CalMeshPointsGradientAndEigenVecs(&local_vipss_);
+    std::cout << " start to CalculateRidgeEdgesFromMesh " << std::endl;
+    vipss_ridges_.CalculateRidgeEdgesFromMesh();
+    ridge_edges_save_path_ = out_dir_ + "/" + file_name_ + "_out_ridges.obj";
+    vipss_ridges_.SaveRidgesToObj(ridge_edges_save_path_);
+    // vipss_ridges_.CalEdgePointQuality(&local_vipss_);
+    auto new_ridge_path = out_dir_ + "/" + file_name_ + "_out_ridges_quality.ply";
+    // vipss_ridges_.SaveRidgesToPLY(new_ridge_path);
+    // std::string out_csv_file = out_dir_ + file_name_ + "_time_stats_" + std::to_string(user_lambda_) + " .txt";
+    // WriteStatsTimeCSV(out_csv_file, G_VP_stats);
+    // std::string out_csv_re_file = out_dir_ + file_name_ + "_res.txt";
+    // WriteVectorValsToCSV(out_csv_re_file, G_VP_stats.residuals_);
+
 }
 
 void VIPSSUnit::CalEnergyWithGtNormal()
@@ -1128,9 +1363,51 @@ void VIPSSUnit::CompareMeshDiff(std::shared_ptr<RBF_Core> rbf_func)
     {
         out_faces.push_back({faces[3*i], faces[3*i +1], faces[3*i + 2]});
     }
-
     std::string out_path = "../../out/test/kitten_h004_0.01_mesh_lv_color.obj";
     std::cout << "output mesh path : " << out_path << std::endl;
     writePlyMeshWithColor(out_path, vts, colors, out_faces);
+}
 
+
+void VIPSSUnit::GenerateGridPts()
+{
+    int dim_size = 250;
+    
+    double x_max = local_vipss_.voro_gen_.bbox_max_[0];
+    double y_max = local_vipss_.voro_gen_.bbox_max_[1];
+
+    double x_min = local_vipss_.voro_gen_.bbox_min_[0];
+    double y_min = local_vipss_.voro_gen_.bbox_min_[1];
+
+    x_max = 0.25;
+    x_min = -0.25;
+    y_max = 1.05;
+    y_min = 0.55;
+    double len = max(x_max - x_min, y_max -y_min);
+    // double scale = 1.2;
+    double scale = 1.0;
+
+    double step = len / double(dim_size) * scale;
+
+    double x_st = x_min * scale;
+    double y_st = y_min * scale;
+    double z_val = 0.0;
+    int x_dim = int( (x_max - x_min) * scale / step + 0.5); 
+    int y_dim = int( (y_max - y_min) * scale / step + 0.5); 
+
+    std::cout << "x dim " << x_dim << std::endl;
+    std::cout << "y dim " << y_dim << std::endl;
+    for(int xi = 0; xi <= x_dim; ++xi)
+    {
+        double x_val = x_st + step * xi;
+        for(int yi = 0; yi <= y_dim; ++yi)
+        {
+            double y_val = y_st + step * yi; 
+            grid_pts_.push_back({x_val, y_val, z_val});
+            double dist_val = LocalVipss::NNDistFunction({x_val, y_val, z_val});
+            grid_pts_dist_vals_.push_back(dist_val);
+        }
+    }
+    std::string out_grid_path = out_dir_ + "/" + file_name_+  "_grid_pts.ply";
+    SavePointsWithQualityToPLY(out_grid_path, grid_pts_, grid_pts_dist_vals_);
 }

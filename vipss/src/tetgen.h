@@ -2238,6 +2238,7 @@ static double tet_search_time_st;
   void outelements(tetgenio*);
   void outfaces(tetgenio*);
   void outhullfaces(tetgenio*);
+  void outhullPts(tetgenio*, std::vector<point>& pts);
   void outsubfaces(tetgenio*);
   void outedges(tetgenio*);
   void outsubsegments(tetgenio*);

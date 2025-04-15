@@ -330,7 +330,7 @@ void InitNormalPartialVipss(std::vector<double> &Vs, size_t key_ptn, std::shared
         rfb_ptr->OptNormal(0);
     }
     rfb_ptr->EstimateNormals();
-   
+    
     auto t1 = Clock::now();
     double pre_time = (std::chrono::nanoseconds(t1 - t0).count()/1e9);
 }
@@ -426,4 +426,36 @@ double VIPSS_HRBF_Dist_Alone(const double* in_pt, const arma::vec& a, const arma
     // std::cout << "  poly_part " << poly_part << std::endl;
     double re = loc_part + poly_part;
     return re;
+}
+
+
+
+void BuildGlobalHRBFVipss(std::vector<double> &Vs, std::shared_ptr<RBF_Core> rfb_ptr, double lambda)
+{
+    auto t0 = Clock::now();
+    // std::cout << " input pt size " << Vs.size()/3 << std::endl;
+    // para_.user_lamnbda = lambda;
+    // RBF_Core rbf_core_;
+    // std::cout << " input key pt size  00 "  << std::endl;
+    rfb_ptr->key_npt = Vs.size()/3;
+
+    std::cout << " input key pt size " << rfb_ptr->key_npt  << std::endl;
+    
+    rfb_ptr->InjectData(Vs, RBF_API::para_);
+    // rfb_ptr->User_Lamnbda = lambda;
+    rfb_ptr->BuildK(lambda);
+
+    std::cout << " finish build k " << std::endl;
+    double build_time = (std::chrono::nanoseconds(Clock::now() - t0).count()/1e9);
+    
+    rfb_ptr->InitNormal();
+    std::cout << " finish InitNormal " << std::endl;
+
+    rfb_ptr->OptNormal(0);
+
+    
+
+    
+    auto t1 = Clock::now();
+    double pre_time = (std::chrono::nanoseconds(t1 - t0).count()/1e9);
 }

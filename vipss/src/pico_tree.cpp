@@ -25,7 +25,7 @@ void PicoTree::Init(const std::vector<double*>& in_pts)
     return;
 }
 
-int PicoTree::SearchNearestPt(double x, double y, double z)
+int PicoTree::SearchNearestPt(double x, double y, double z) const 
 {
     data_type query[3] = {x, y, z};
     Nn result;
@@ -34,7 +34,7 @@ int PicoTree::SearchNearestPt(double x, double y, double z)
     return pt_id;
 }
 
-std::vector<int> PicoTree::SearchNearestKNN(double x, double y, double z, int k = 8)
+std::vector<int> PicoTree::SearchNearestKNN(double x, double y, double z, int k = 8) const
 {
     data_type query[3] = {x, y, z};
     std::vector<Nn> knn;
@@ -48,7 +48,7 @@ std::vector<int> PicoTree::SearchNearestKNN(double x, double y, double z, int k 
     return ids;
 }
 
-double PicoTree::NearestPtDist(double x, double y, double z)
+double PicoTree::NearestPtDist(double x, double y, double z) const
 {
     data_type query[3] = {x, y, z};
     Nn result;
