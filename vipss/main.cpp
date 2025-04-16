@@ -30,11 +30,12 @@ int main(int argc, char** argv)
     {
         std::string input;
         std::string output;
+        std::string ridge_mesh_path;
         double lambda = 0.0;
         int volumeDim = 100;
         bool surfacing = true;
         bool initPV = true;
-        bool hardConstraints = true;
+        bool hardConstraints = false;
         bool rbf_base = false;
         double opt_threshold = 1e-7;
         double adgrid_threshold = 0.001;
@@ -43,12 +44,14 @@ int main(int argc, char** argv)
         bool hrbf_sample = false;
         bool use_global_hrbf = false;
         bool memory_efficient = false;
-        int max_iter_num = 3000;
+        int max_iter_num = 10000;
         int batch_size = 10000;
         int constraint_level =0;
         double alpha = 50.0;
         bool use_input_normal = false;
         double iso_offset = 0.0;
+        bool cal_ridges = false;
+        
     }args;
     
     // gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -60,7 +63,7 @@ int main(int argc, char** argv)
     app.add_option("-P, --initPV", args.initPV, "enable or disable partial vipss for normal initialization");
     app.add_option("-S, --surfacing", args.surfacing, "reconstruct surface or not");
     app.add_option("-H, --hardConstraints", args.hardConstraints, "use hard constraints for energy optimization");
-    app.add_option("-R, --use_rbfBase",args.rbf_base, "use simplified rbf base");
+    // app.add_option("-R, --use_rbfBase",args.rbf_base, "use simplified rbf base");
     app.add_option("-t, --opt_threshold",args.opt_threshold, "use simplified rbf base");
     app.add_option("-a, --adgrid_threshold",args.adgrid_threshold, "adptive gird generation threshold");
     app.add_option("-A, --use_adgrid",args.use_adgrid, "use adptive gird to generate mesh");
@@ -73,6 +76,8 @@ int main(int argc, char** argv)
     app.add_option(" --alpha", args.alpha, " soft constraints alpha value, larger value has harder constraints ");
     app.add_option("-N, --use_input_normal",args.use_input_normal, "use input normal to build dist function");
     app.add_option(" --iso_offset", args.iso_offset, " iso offset value for adaptive grid surface ");
+    app.add_option("-E, --cal_ridges", args.cal_ridges, " use NN-VIPSS to cal ridges ");
+    app.add_option("-r, --ridge_mesh", args.ridge_mesh_path, " input rigde mesh path ");
 
     CLI11_PARSE(app, argc, argv);
     // LocalVipss::use_octree_sample_ = args.octree_sample;
@@ -84,6 +89,12 @@ int main(int argc, char** argv)
     vipss_unit.user_alpha_ = args.alpha;
     vipss_unit.use_input_normal_ = args.use_input_normal;
     vipss_unit.only_use_nn_hrbf_surface_ = args.only_surface;
+    vipss_unit.ridge_mesh_path_ = args.ridge_mesh_path;
+    if(vipss_unit.only_use_nn_hrbf_surface_)
+    {
+        vipss_unit.use_input_normal_ = true;
+    }
+
     if(args.input.size() > 0)
     {
         std::string in_path, in_filename, in_extname;
@@ -102,7 +113,6 @@ int main(int argc, char** argv)
         vipss_unit.use_global_hrbf_ = args.use_global_hrbf;
         vipss_unit.local_vipss_.min_batch_size_ = args.batch_size;
         vipss_unit.iso_offset_val_ = args.iso_offset;
-
         if(args.output.size() > 0)
         {
             std::string out_path, out_filename, out_extname;
@@ -110,10 +120,6 @@ int main(int argc, char** argv)
             vipss_unit.out_dir_ = out_path;
             vipss_unit.file_name_ = out_filename;
             vipss_unit.local_vipss_.out_dir_ = vipss_unit.out_dir_;
-
-            // std::cout << "output path : " << out_path << std::endl;
-            // std::cout << "out_filename : " << out_filename << std::endl;
-            // std::cout << "out_extname : " << out_extname << std::endl;
             vipss_unit.out_normal_path_ = out_path + "/" + out_filename + "_out_normal";
             vipss_unit.out_surface_path_ = args.output;
             vipss_unit.out_debug_path_ = out_path + "/" + out_filename + "_debug.txt";
@@ -132,7 +138,14 @@ int main(int argc, char** argv)
         vipss_unit.axi_plane_ = AXI_PlANE::XYZ;
         vipss_unit.hrbf_type_ = HRBF_SURFACE_TYPE::LOCAL_HRBF_NN;
         // vipss_unit.hrbf_type_ = HRBF_SURFACE_TYPE::GLOBAL_HRBF;
-        vipss_unit.Run();
+        if(args.cal_ridges)
+        {
+            vipss_unit.RunRidgesGHRBF();
+            // vipss_unit.RunRidges();
+        } else {
+            vipss_unit.Run();
+        }
+        
     } else {
         std::cout << "There is no valid input point path !" << std::endl;
     }
