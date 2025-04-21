@@ -52,7 +52,7 @@ void VIPSSUnit::InitPtNormalWithLocalVipss()
     {
 
         local_vipss_.BuildMatrixHMemoryOpt();
-        local_vipss_.SetBestNormalsWithHmat();
+        // local_vipss_.SetBestNormalsWithHmat();
         if(user_lambda_ < 1e-12)
         {
             local_vipss_.final_h_eigen_ = local_vipss_.final_h_eigen_.block(npt_, npt_, 3 * npt_, 3 * npt_);
@@ -572,7 +572,6 @@ void VIPSSUnit::BuildNNHRBFFunctions()
         std::cout << " insert octree center pts num : " << octree.octree_centers_.size() << std::endl; 
         octree_sample_pts = octree.octree_centers_;
     }
-
     local_vipss_.voro_gen_.GenerateVoroData();
     local_vipss_.voro_gen_.SetInsertBoundaryPtsToUnused();
     std::cout << " build voronoi success ! " << std::endl;
@@ -623,20 +622,20 @@ void VIPSSUnit::BuildNNHRBFFunctions()
         auto t001 = Clock::now();
         // std::string octree_sample_path = out_dir_ + file_name_ + "octree_sample.xyz";
         // std::ofstream octree_file(octree_sample_path);
-    // if(0)
-    // {
-    //     for(auto pt : octree_sample_pts)
-    //     {
-    //         double gradient[3];
-    //         double dist_val = local_vipss_.NatureNeighborGradientOMP(&pt[0], gradient);
-    //         local_vipss_.s_vals_.push_back(dist_val);
-    //         local_vipss_.normals_.push_back(-1.0 * gradient[0] );
-    //         local_vipss_.normals_.push_back(-1.0 * gradient[1] );
-    //         local_vipss_.normals_.push_back(-1.0 * gradient[2] );
-    //         // octree_file << pt[0] << " " << pt[1] << " " << pt[2] << " ";
-    //         // octree_file << gradient[0] << " " << gradient[1] << " " << gradient[2] << std::endl;
-    //     }
-    // }
+        // if(0)
+        // {
+        //     for(auto pt : octree_sample_pts)
+        //     {
+        //         double gradient[3];
+        //         double dist_val = local_vipss_.NatureNeighborGradientOMP(&pt[0], gradient);
+        //         local_vipss_.s_vals_.push_back(dist_val);
+        //         local_vipss_.normals_.push_back(-1.0 * gradient[0] );
+        //         local_vipss_.normals_.push_back(-1.0 * gradient[1] );
+        //         local_vipss_.normals_.push_back(-1.0 * gradient[2] );
+        //         // octree_file << pt[0] << " " << pt[1] << " " << pt[2] << " ";
+        //         // octree_file << gradient[0] << " " << gradient[1] << " " << gradient[2] << std::endl;
+        //     }
+        // }
         auto t0022 = Clock::now();
         G_VP_stats.octree_pt_gradient_cal_time_ = std::chrono::nanoseconds(t0022 - t001).count() / 1e9;
         std::cout << "evaluate octree sample time : " << G_VP_stats.octree_pt_gradient_cal_time_ << std::endl;
@@ -795,7 +794,6 @@ void VIPSSUnit::ReconSurface()
     }
 }
 
-
 void VIPSSUnit::ReconSurfaceHRBF(std::shared_ptr<RBF_Core> HRBF_ptr)
 {
     printf(" start ReconSurface \n");
@@ -816,26 +814,20 @@ void VIPSSUnit::ReconSurfaceHRBF(std::shared_ptr<RBF_Core> HRBF_ptr)
     } 
 }
 
-
 void VIPSSUnit::GenerateAdaptiveGrid()
 {
-    
     // std::cout << " test val " << test_val << std::endl;
     std::array<size_t,3> resolution = {3, 3, 3};
     std::vector<shared_ptr<ImplicitFunction<double>>> functions;
     // load_functions(args.function_file, functions);
 
-    
     if(use_global_hrbf_)
-    // if(LOCAL_HRBF_NN != hrbf_type_)
     {
-
         std::cout << "surface function : global HRBF !" << std::endl;
         auto g_t0 = Clock::now();
         using Vec3 = Eigen::Matrix<double, 3, 1>;
         using Vec4 = Eigen::Matrix<double, 4, 1>;
         auto g_hrbf = std::make_shared<RBF_Core>();
-
         // if(only_use_nn_hrbf_surface_)
         // {
             std::vector<double> in_pts;
@@ -845,8 +837,6 @@ void VIPSSUnit::GenerateAdaptiveGrid()
             newnormals_ = in_normals;
             local_vipss_.out_normals_ = in_normals;
         // }
-       
-        
         // std::string vipss_pt_path = "/home/jjxia/Documents/prejects/VIPSS/data/noise_kitten/kitten_h004.001/input_normal_0.001.ply";
         // std::string vipss_s_val_path = "/home/jjxia/Documents/projects/VIPSS_LOCAL/data/scaled/kitten_h004_vals/kitten_h004_0.01.txt";
         // std::string vipss_s_val_path = "/home/jjxia/Documents/projects/VIPSS_LOCAL/data/scaled/kitten_h004_vals/kitten_h004_s_val_0.01.txt";
@@ -1089,11 +1079,11 @@ void VIPSSUnit::Run()
             sign_sum += arma::dot(diff, hull_normals[i]); 
         }
         std::cout << " sign_sum value " << sign_sum << std::endl;
-        // auto out_normals  = newnormals_;
+        auto out_normals  = newnormals_;
         std::cout << " newnormals_ size " <<(int) newnormals_.size() << std::endl;
         if(sign_sum < 0)
         {
-            for( auto& ele : newnormals_)
+            for( auto& ele : out_normals)
             {
                 ele *= -1.0;
             }
@@ -1107,9 +1097,10 @@ void VIPSSUnit::Run()
             out_pts[3*i + 1] = local_vipss_.out_pts_[3*i + 1] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[1];
             out_pts[3*i + 2] = local_vipss_.out_pts_[3*i + 2] * local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[2];
         }
-        writePLYFile_VN(out_normal_path_, out_pts, newnormals_);
+        writePLYFile_VN(out_normal_path_, out_pts, out_normals);
         std::cout << " save estimated normal to file : " << out_normal_path_ << std::endl;
     }
+
     
     if (is_surfacing_)
     {
@@ -1194,11 +1185,11 @@ void VIPSSUnit::Run()
     }
     // test_vipss_timing::test_local_vipss(input_data_path_);
     // test_vipss_timing::visual_distval_pt(input_data_path_, 200);
-    // std::string out_csv_file = out_dir_ + file_name_ + "_time_stats_" + std::to_string(user_lambda_) + " .txt";
-    // WriteStatsTimeCSV(out_csv_file, G_VP_stats);
+    std::string out_csv_file = out_dir_ + file_name_ + "_time_stats_" + std::to_string(user_lambda_) + " .txt";
+    WriteStatsTimeCSV(out_csv_file, G_VP_stats);
 
-    // std::string out_csv_re_file = out_dir_ + file_name_ + "_res.txt";
-    // WriteVectorValsToCSV(out_csv_re_file, G_VP_stats.residuals_);
+    std::string out_csv_re_file = out_dir_ + file_name_ + "_res.txt";
+    WriteVectorValsToCSV(out_csv_re_file, G_VP_stats.residuals_);
 }
 
 void VIPSSUnit::RunRidgesGHRBF()

@@ -392,8 +392,6 @@ void VoronoiGen::Tetrahedralize()
 
     m.outhullPts(m.in, convex_hull_pts_);
 
-    // InsertSphereBoundryPts42();
-
     BuildPtIdMap();
     InsertSphereBoundryPts42();
     // printf("finsh BuildPtIdMap \n");

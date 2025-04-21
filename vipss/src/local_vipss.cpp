@@ -1863,7 +1863,6 @@ void LocalVipss::CalculateClusterNeiScores(bool is_init)
         // #pragma omp critical
             // cluster_scores_mat_(i, n_pid) = score;
         }
-        
     }
     cluster_scores_mat_.setFromTriplets(score_eles.begin(), score_eles.end());
 }
@@ -1925,10 +1924,8 @@ void LocalVipss::BuildClusterMST(bool use_distance_weight = false)
 {
     std::set<std::string> visited_edge_ids;
     std::vector<C_Edege> tree_edges;
-
     auto cmp = [](const C_Edege& left, const C_Edege& right) { return left.score_ > right.score_; };
     std::priority_queue<C_Edege, std::vector<C_Edege>, decltype(cmp)> edge_priority_queue(cmp);
-
     C_Edege st_e(0,0);
     edge_priority_queue.push(st_e);
     std::set<size_t> visited_vids;
@@ -1956,10 +1953,10 @@ void LocalVipss::BuildClusterMST(bool use_distance_weight = false)
             if(n_id == cur_pid) continue;
             C_Edege edge(cur_pid, n_id);
             edge.score_ = cluster_scores_mat_.coeff(n_id, cur_pid);
-            if(use_distance_weight)
+            // if(use_distance_weight)
             {
                 double dist = PtDistance(points_[n_id], points_[cur_pid]);
-                // edge.score_ = sqrt(dist) * edge.score_;
+                edge.score_ = sqrt(dist) * edge.score_;
             }
             edge_priority_queue.push(edge);
         }
@@ -2010,6 +2007,97 @@ void LocalVipss::FlipClusterNormalsByMST()
         }
     }
 }
+
+void LocalVipss::FlipClusterNormalsFromConvexHull()
+{
+    std::vector<double> out_hull_pts;
+    arma::vec3 hull_c= {0, 0, 0};   
+    std::vector<arma::vec3> hull_normals;
+    std::unordered_set<size_t> visited_ids;
+    std::unordered_set<size_t> flipped_ids;
+    for(auto pt : voro_gen_.convex_hull_pts_)
+    {
+        hull_c[0] += pt[0];
+        hull_c[1] += pt[1];
+        hull_c[2] += pt[2];
+    }
+    if(!voro_gen_.convex_hull_pts_.empty())
+    {
+        hull_c = hull_c / voro_gen_.convex_hull_pts_.size();
+    }
+
+    auto cmp = [](const C_Edege& left, const C_Edege& right) 
+    {
+        // if (left.depth == right.depth)
+        //     return left.score_ > right.score_; 
+        // return  left.depth > right.depth; 
+        return left.score_ > right.score_;
+    };
+    std::priority_queue<C_Edege, std::vector<C_Edege>, decltype(cmp)> edge_priority_queue(cmp);
+    std::queue<size_t> candid_pids;
+    for(auto pt : voro_gen_.convex_hull_pts_)
+    {
+        size_t pid = voro_gen_.point_id_map_[pt];
+        double nx =  cluster_normal_x_.coeff(pid, pid);
+        double ny =  cluster_normal_y_.coeff(pid, pid);
+        double nz =  cluster_normal_z_.coeff(pid, pid);
+        double dx = pt[0] - hull_c[0];
+        double dy = pt[1] - hull_c[1];
+        double dz = pt[2] - hull_c[2];
+        double dot_val = nx * dx + ny * dy + nz * dz;
+        if(dot_val < 0)
+        {
+            cluster_normal_x_.col(pid) *= -1.0;
+            cluster_normal_y_.col(pid) *= -1.0;
+            cluster_normal_z_.col(pid) *= -1.0;
+        }
+        // flipped_ids.insert(pid);
+        visited_ids.insert(pid); 
+      
+        const arma::sp_umat& adj_row =  voro_gen_.pt_adjecent_mat_.col(pid);
+        const arma::sp_umat::const_iterator start = adj_row.begin();
+        const arma::sp_umat::const_iterator end = adj_row.end();
+        for(auto iter = start; iter != end; ++iter)
+        {
+            size_t n_id = iter.row();
+            if(visited_ids.find(n_id) != visited_ids.end()) continue;
+            if(n_id == pid) continue;
+            C_Edege edge(pid, n_id);
+            double dist = PtDistance(points_[n_id], points_[pid]);
+            edge.score_ = cluster_scores_mat_.coeff(n_id, pid) ;
+            edge_priority_queue.push(edge);
+        }
+    }
+    while(!edge_priority_queue.empty())
+    {
+        C_Edege cur_e = edge_priority_queue.top();
+        edge_priority_queue.pop();
+        if(visited_ids.find(cur_e.c_b_ ) != visited_ids.end()) continue;
+        visited_ids.insert(cur_e.c_b_);
+        if(FlipClusterNormalSimple(cur_e.c_a_, cur_e.c_b_))
+        {
+            cluster_normal_x_.col(cur_e.c_b_) *= -1.0;
+            cluster_normal_y_.col(cur_e.c_b_) *= -1.0;
+            cluster_normal_z_.col(cur_e.c_b_) *= -1.0;
+            s_vals_[cur_e.c_b_] *= -1.0;
+        }
+        const arma::sp_umat& adj_row =  voro_gen_.pt_adjecent_mat_.col(cur_e.c_b_);
+        const arma::sp_umat::const_iterator start = adj_row.begin();
+        const arma::sp_umat::const_iterator end = adj_row.end();
+        for(auto iter = start; iter != end; ++iter)
+        {
+            size_t n_id = iter.row();
+            if(visited_ids.find(n_id) != visited_ids.end()) continue;
+            if(n_id == cur_e.c_b_) continue;
+            C_Edege edge(cur_e.c_b_, n_id);
+            double dist = PtDistance(points_[n_id], points_[cur_e.c_b_]);
+            edge.score_ = cluster_scores_mat_.coeff(n_id, cur_e.c_b_) ;
+            edge.depth = cur_e.depth + 1;
+            edge_priority_queue.push(edge);
+        }
+    }
+}
+
 
 std::vector<double> LocalVipss::GetInitPts() const
 {
@@ -2332,10 +2420,15 @@ void LocalVipss::InitNormals()
     out_pts_ = GetInitPts();
     out_normals_ = GetInitNormals();
     
-    BuildClusterMST(use_distance_weight);
-    FlipClusterNormalsByMST();
+    // BuildClusterMST(use_distance_weight);
+    // FlipClusterNormalsByMST();
     s_vals_dist_ = s_vals_;
-    out_normals_dist_ = GetInitNormals();
+    // out_normals_dist_ = GetInitNormals();
+    out_normals_dist_ = out_normals_;
+
+    // FlipClusterNormalsFromConvexHull();
+    // out_normals_ = GetInitNormals();
+    // out_normals_dist_ = GetInitNormals();
 
     auto finat_t = Clock::now();
     double init_total_time = std::chrono::nanoseconds(finat_t - t0).count()/1e9;

@@ -26,6 +26,7 @@ class C_Edege{
         size_t c_b_;
         double score_;
         std::string e_id_;
+        int depth = 0;
 };
 
 struct SP_BBOX{
@@ -77,6 +78,7 @@ class LocalVipss {
         inline bool FlipClusterNormal2(size_t c_a, size_t c_b) const;
         void BuildClusterMST(bool use_distance_weight);
         void FlipClusterNormalsByMST();
+        void FlipClusterNormalsFromConvexHull();
         void WriteVipssTimeLog();
         void SaveCluster();
         void SaveClusterPts(const std::string& path,
