@@ -1,6 +1,7 @@
 #include "rbf_api.h"
 #include <chrono>
 #include "kernel.h"
+#include <array>
 
 typedef std::chrono::high_resolution_clock Clock;
 

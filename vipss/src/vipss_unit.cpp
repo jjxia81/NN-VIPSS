@@ -507,7 +507,7 @@ void VIPSSUnit::OptUnitVipssNormal(){
     // std::string s_val_path = "./s_vals_init.txt";
     // WriteVectorValsToCSV(s_val_path, local_vipss_.s_vals_);
 
-    #pragma oomp parallel for
+
     for(int i=0;i<npt_;++i){
         double *veccc = local_vipss_.out_normals_.data()+i*3;
         {

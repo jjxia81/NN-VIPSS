@@ -1869,8 +1869,8 @@ void GetTetEdges(const vector<array<size_t, 4>>& tets, std::vector<std::array<si
     {
         for(const auto& e : tet_edges)
         {
-            int pa_id = tet[e[0]];  
-            int pb_id = tet[e[1]];  
+            size_t pa_id = tet[e[0]];  
+            size_t pb_id = tet[e[1]];  
             std::array<size_t, 2> edge = pa_id < pb_id ? std::array<size_t, 2>{pa_id, pb_id} 
                                                         : std::array<size_t, 2>{pb_id, pa_id};
             string e_key = std::to_string(edge[0]) + "_" + std::to_string(edge[1]);
