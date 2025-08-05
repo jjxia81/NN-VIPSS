@@ -75,7 +75,7 @@ int main(int argc, char** argv)
     app.add_option("-c, --constraint_level", args.constraint_level, "optimization contraint level, the higher value the higher punish term");
     app.add_option(" --alpha", args.alpha, " soft constraints alpha value, larger value has harder constraints ");
     app.add_option("-N, --use_input_normal",args.use_input_normal, "use input normal to build dist function");
-    app.add_option(" --iso_offset", args.iso_offset, " iso offset value for adaptive grid surface ");
+    app.add_option("--iso_offset", args.iso_offset, " iso offset value for adaptive grid surface ");
     app.add_option("-E, --cal_ridges", args.cal_ridges, " use NN-VIPSS to cal ridges ");
     app.add_option("-r, --ridge_mesh", args.ridge_mesh_path, " input rigde mesh path ");
 
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
         // vipss_unit.hrbf_type_ = HRBF_SURFACE_TYPE::GLOBAL_HRBF;
         if(args.cal_ridges)
         {
-            vipss_unit.RunRidgesGHRBF();
+            vipss_unit.RunRidgesGHRBF2();
             // vipss_unit.RunRidges();
         } else {
             vipss_unit.Run();

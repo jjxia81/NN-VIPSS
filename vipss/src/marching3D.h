@@ -282,6 +282,25 @@ void MarchingTet3D(const std::vector<std::array<Float, 3> >& vertices,
                    std::vector<std::array<Float, 3> >& output_vertices,
                    std::vector<std::array<size_t, 3> >& output_triangles);
 
+/**
+ * @brief Given a list of vertices, tetrahedrons,  scalar values, and gradients (optional) at each vertex,
+ * compute the zero-surface as a list of 3D zero-crossing points and a list of 2D triangular faces.
+ * The resulting triangles are orientated towards the positive space.
+ * @param vertices 3D vertices of the tet-prism mesh
+ * @param tets tets of the tet-prism mesh
+ * @param values scalar values at each vertex
+ * @param gradients gradients at each vertex. Only used when its size is equal to vertices.size().
+ * @param output_vertices output vertices of the zero-surface
+ * @param output_triangles output triangles of the zero-surface
+ */
+template <typename Float>
+void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
+                   const std::vector<std::array<size_t, 4> >& tets,
+                   const std::vector<Float>& values,
+                   const std::vector<std::array<Float, 3> >& gradients,
+                   std::vector<std::array<Float, 3> >& output_vertices,
+                   std::vector<std::array<size_t, 3> >& output_triangles);
+
 // extern template void MarchingTet3D<double>(const std::vector<std::array<double, 3> >& vertices,
 //                                            const std::vector<std::array<size_t, 4> >& tets,
 //                                            const std::vector<double>& values,

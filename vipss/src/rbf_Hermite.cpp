@@ -704,9 +704,9 @@ void RBF_Core::Set_RBFCoefWithOptNormalAndSval(const std::vector<double>& Vn,
     newnormals = Vn;
     arma::vec y(npt + 3 * key_npt);
     for(size_t i=0;i<key_npt;++i){
-        y(npt+i) = newnormals[i*3];
-        y(npt+i+key_npt) = newnormals[i*3+1];
-        y(npt+i+key_npt*2) = newnormals[i*3+2];
+        y(npt+i) = -newnormals[i*3];
+        y(npt+i+key_npt) = -newnormals[i*3+1];
+        y(npt+i+key_npt*2) = -newnormals[i*3+2];
     }
     if(User_Lamnbda>0)
     {

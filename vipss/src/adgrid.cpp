@@ -178,6 +178,7 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     std::cout << "bbox min " << bbox_min[0] << " " << bbox_min[1] << " " << bbox_min[2] << std::endl;
     std::cout << "bbox max " << bbox_max[0] << " " << bbox_max[1] << " " << bbox_max[2] << std::endl;
 
+    // double expand_scale = 0.2;
     double expand_scale = 0.2;
     double dx = bbox_max[0] - bbox_min[0];
     double dy = bbox_max[1] - bbox_min[1];
@@ -185,9 +186,9 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     double max_len = std::max(dx, std::max(dy, dz));
     
     double max_scale = 5.0;
-    double expand_scale_x = 0.2 * std::max(1.0, std::min(max_scale, max_len / dx / 2.0));
-    double expand_scale_y = 0.2 * std::max(1.0, std::min(max_scale, max_len / dy / 2.0));
-    double expand_scale_z = 0.2 * std::max(1.0, std::min(max_scale, max_len / dz / 2.0));
+    double expand_scale_x = expand_scale * std::max(1.0, std::min(max_scale, max_len / dx / 2.0));
+    double expand_scale_y = expand_scale * std::max(1.0, std::min(max_scale, max_len / dy / 2.0));
+    double expand_scale_z = expand_scale * std::max(1.0, std::min(max_scale, max_len / dz / 2.0));
 
     // double expand_scale_x = expand_scale;
     // double expand_scale_y = expand_scale;
@@ -744,10 +745,11 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     std::cout << " gradients size " <<  gradients.size() << std::endl;
     std::cout << " vertices size " <<  vertices.size() << std::endl;
 
-    marching3D::MarchingTet3D( vertices, tets, values, gradients, output_vertices, output_triangles);
+    // marching3D::MarchingTet3D( vertices, tets, values, gradients, output_vertices, output_triangles);
+    marching3D::MarchingTet3DEdges( vertices, tets, values, gradients, output_vertices, output_triangles);
 
-    // std::string tet_edge_path = outfile + "_tet_edges.ply";
-    // SaveTetMeshToPly(vertices, tets, values, tet_edge_path);
+    std::string tet_edge_path = outfile + "_tet_edges.ply";
+    SaveTetMeshToPly(vertices, tets, values, tet_edge_path);
     
     // std::string tet_path = outfile + "_tet_data.txt";
     // SaveTetToFile(vertices, tets, tet_path);

@@ -39,6 +39,7 @@ class VIPSSUnit {
         void Run();
         void RunRidges();
         void RunRidgesGHRBF();
+        void RunRidgesGHRBF2();
         void test_partial_vipss();
         void BuildTetCentersMap();
         void BuildLocalHRBFPerNode();
@@ -52,6 +53,8 @@ class VIPSSUnit {
         void AdaptiveGridHRBF(std::shared_ptr<RBF_Core> rbf_func, 
                     std::vector<std::array<double, 3> >& output_vertices,
                     std::vector<std::array<size_t, 3> >& output_triangles);
+
+        void NormalizeInputPoints(std::vector<double>& pts);
 
     public:
         std::string file_name_;

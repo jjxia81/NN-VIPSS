@@ -142,7 +142,7 @@ class LocalVipss {
         RBF_API vipss_api_;
 
         std::array<double,3> in_pt_center_;
-        double in_pt_scale_;
+        double in_pt_scale_ = 1.0;
 
         // std::vector<std::unordered_set<size_t>> cluster_adjacent_ids_;
         // std::vector<std::unordered_set<size_t>> cluster_pt_ids_;

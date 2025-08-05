@@ -1673,7 +1673,31 @@ void WriteVectorValsToCSV(const std::string& path, const std::vector<double>& ve
             csv_file << val << std::endl;
         }
     } 
+    csv_file.close();
 }
+
+
+void WriteVectorValsToCSV(const std::string& path, const std::vector<std::vector<double>>& vector_vals)
+{
+    std::ofstream csv_file;
+    csv_file.open(path);
+    if(vector_vals.empty()) return;
+    int n_cols = vector_vals.size();
+    if(csv_file)
+    {
+        int n_lines = vector_vals[0].size();
+        for(int i = 0; i < n_lines; ++i)
+        {
+            for(int j = 0; j < n_cols; ++j)
+            {
+                csv_file << vector_vals[j][i] << " " ;
+            }
+            csv_file<< std::endl;
+        }
+    }
+    csv_file.close(); 
+}
+
 
 
 std::vector<double> ReadVectorFromFile(const std::string& filename) {

@@ -76,3 +76,5 @@ double VIPSS_HRBF_Dist_Alone(const double* in_pt, const arma::vec& a, const arma
                                 const std::vector<std::array<double,3>>& all_pts);
 
 void BuildGlobalHRBFVipss(std::vector<double> &Vs, std::shared_ptr<RBF_Core> rfb_ptr, double lambda);
+void BuildGlobalHRBFVipssWithNormals(std::vector<double> &Vs, std::vector<double> &Vn,
+    std::shared_ptr<RBF_Core> rfb_ptr, double lambda);
