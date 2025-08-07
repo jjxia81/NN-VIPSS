@@ -1358,9 +1358,9 @@ void VIPSSUnit::RunRidgesGHRBF2()
 
     vipss_ridges_.g_hrfb_ptr = rfb_ptr;
     AdaptiveGridHRBF(rfb_ptr, output_vertices, output_triangles);
+    
     auto tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh" + std::to_string(user_lambda_)+".ply";
     SaveMeshToPly(tet_mesh_path, output_vertices, output_triangles);
-
 
     std::string ridge_mesh_save_path =  "/home/jjxia/Documents/prejects/NN-VIPSS/out/ridge_mesh.ply";
     std::string valley_mesh_save_path =  "/home/jjxia/Documents/prejects/NN-VIPSS/out/valley_mesh.ply";

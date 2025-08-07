@@ -1,29 +1,21 @@
-//#define Check_Flip_Tets
-#include <mtet/mtet.h>
-#include <mtet/io.h>
-#include <ankerl/unordered_dense.h>
-#include <span>
-#include <queue>
-#include <optional>
-#include <SmallVector.h>
+//
+//  init.cpp
+//  adaptive_mesh_refinement
+//
+//  Created by Yiwen Ju on 8/1/24.
+//
 
-#include <implicit_functions/implicit_functions.h>
-#include <adgrid/subdivide_multi.h>
-#include <CLI/CLI.hpp>
-#include <adgrid/tet_quality.h>
-#include <adgrid/timer.h>
-#include <adgrid/grid_mesh.h>
+#include <filesystem>
+#include "io.h"
 
 
-using namespace mtet;
 
 bool save_mesh_json(const std::string& filename,
                     const mtet::MTetMesh mesh)
 {
-    vector<array<double, 3>> vertices((int)mesh.get_num_vertices());
-    vector<array<size_t, 4>> tets((int)mesh.get_num_tets());
-    using IndexMap = ankerl::unordered_dense::map<uint64_t, size_t>;
-    IndexMap vertex_tag_map;
+    std::vector<std::array<double, 3>> vertices((int)mesh.get_num_vertices());
+    std::vector<std::array<size_t, 4>> tets((int)mesh.get_num_tets());
+    ankerl::unordered_dense::map<uint64_t, size_t> vertex_tag_map;
     vertex_tag_map.reserve(mesh.get_num_vertices());
     int counter = 0;
     mesh.seq_foreach_vertex([&](VertexId vid, std::span<const Scalar, 3> data){
@@ -52,18 +44,17 @@ bool save_mesh_json(const std::string& filename,
 
 bool save_function_json(const std::string& filename,
                         const mtet::MTetMesh mesh,
-                        ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<std::array<double, 4>, 20>> vertex_func_grad_map,
+                        ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>> vertex_func_grad_map,
                         const size_t funcNum)
 {
-    vector<vector<double>> values(funcNum);
+    std::vector<std::vector<double>> values(funcNum);
     for (size_t funcIter = 0; funcIter <  funcNum; funcIter++){
         values[funcIter].reserve(((int)mesh.get_num_vertices()));
     }
     mesh.seq_foreach_vertex([&](VertexId vid, std::span<const Scalar, 3> data){
-        llvm_vecsmall::SmallVector<std::array<double, 4>, 20> func_gradList(funcNum);
+        llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20> func_gradList(funcNum);
         func_gradList = vertex_func_grad_map[value_of(vid)];
         for (size_t funcIter = 0; funcIter < funcNum; funcIter++){
-            cout << data[0] << " " << data[1] << " " << data[2] << ": " << func_gradList[funcIter][0] << ", " << func_gradList[funcIter][1] << ", " << func_gradList[funcIter][2] << ", " << func_gradList[funcIter][3] << endl;
             values[funcIter].push_back(func_gradList[funcIter][0]);
         }
     });
@@ -83,10 +74,38 @@ bool save_function_json(const std::string& filename,
     fout.close();
     return true;
 }
-//hash for mounting a boolean that represents the activeness to a tet
-//since the tetid isn't const during the process, mount the boolean using vertexids of 4 corners.
-uint64_t vertexHash(std::span<VertexId, 4>& x)
+
+bool save_timings(const std::string& filename,
+                  const std::array<std::string, timer_amount>& time_label,
+                  const std::array<double, timer_amount>& timings)
 {
-    ankerl::unordered_dense::hash<uint64_t> hash_fn;
-    return hash_fn(value_of(x[0])) + hash_fn(value_of(x[1])) + hash_fn(value_of(x[2])) + hash_fn(value_of(x[3]));
+    using json = nlohmann::json;
+    std::ofstream fout(filename.c_str(),std::ios::app);
+    //fout.open(filename.c_str(),std::ios::app);
+    json jOut;
+    for (size_t i = 0; i < timings.size(); ++i) {
+        jOut[time_label[i]] = timings[i];
+    }
+    //
+    fout << jOut << std::endl;
+    fout.close();
+    return true;
+}
+
+bool save_metrics(const std::string& filename,
+                  const std::array<std::string, 6>& tet_metric_labels,
+                  const tet_metric metric_list)
+{
+    using json = nlohmann::json;
+    std::ofstream fout(filename.c_str(),std::ios::app);
+    json jOut;
+    jOut[tet_metric_labels[0]] = metric_list.total_tet;
+    jOut[tet_metric_labels[1]] = metric_list.active_tet;
+    jOut[tet_metric_labels[2]] = metric_list.min_radius_ratio;
+    jOut[tet_metric_labels[3]] = metric_list.active_radius_ratio;
+    jOut[tet_metric_labels[4]] = metric_list.two_func_check;
+    jOut[tet_metric_labels[5]] = metric_list.three_func_check;
+    fout << jOut << std::endl;
+    fout.close();
+    return true;
 }

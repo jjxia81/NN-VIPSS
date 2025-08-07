@@ -1,9 +1,7 @@
 //
 // Created by Charles Du on 1/15/24.
 //
-
-#ifndef ADAPTIVE_MESH_REFINEMENT_GRID_MESH_H
-#define ADAPTIVE_MESH_REFINEMENT_GRID_MESH_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -109,6 +107,102 @@ namespace grid_mesh {
         return mesh;
     }
 
+    mtet::MTetMesh generate_from_kuhn_mesh(const std::array<size_t, 3> &resolution,
+                                     const std::array<double, 3> &bbox_min,
+                                     const std::array<double, 3> &bbox_max,
+                                     GridStyle style = TET6) {
+        assert(resolution[0] > 0);
+        std::vector<std::array<double, 3>> pts(8);
+        auto compute_coordinate = [&](double t, size_t i) {
+            return t * (bbox_max[i] - bbox_min[i]) + bbox_min[i];
+        };
+        // vertices
+        for (size_t i = 0; i < 2; i++) {
+            double x = compute_coordinate(double(i) / double(2 - 1), 0);
+            for (size_t j = 0; j < 2; j++) {
+                double y = compute_coordinate(double(j) / double(2 - 1), 1);
+                for (size_t k = 0; k < 2; k++) {
+                    double z = compute_coordinate(double(k) / double(2 - 1), 2);
+
+                    size_t idx = i * 4 + j * 2 + k;
+                    pts[idx] = {x, y, z};
+                }
+            }
+        }
+        // tets
+        std::array<std::array<size_t, 4>, 6> tets;
+        tets[0] = {0, 1, 7, 3};
+        tets[1] = {7, 0, 5, 1};
+        tets[2] = {4, 0, 5, 7};
+        tets[3] = {4, 6, 0, 7};
+        tets[4] = {0, 7, 6, 2};
+        tets[5] = {7, 2, 0, 3};
+
+        // build mesh
+        mtet::MTetMesh grid;
+        std::vector<mtet::VertexId> vertex_ids;
+        vertex_ids.reserve(pts.size());
+        for (auto &v: pts) {
+            vertex_ids.push_back(grid.add_vertex(v[0], v[1], v[2]));
+        }
+        for (auto &t: tets) {
+            grid.add_tet(vertex_ids[t[0]], vertex_ids[t[1]], vertex_ids[t[2]], vertex_ids[t[3]]);
+        }
+        std::array<double, 3> bound_box = {bbox_max[0] - bbox_min[0], bbox_max[1] - bbox_min[1], bbox_max[2] - bbox_min[2]};
+        double longest_edge = *std::max_element(bound_box.begin(), bound_box.end()) * resolution[0];
+        
+        auto comp = [](std::pair<mtet::Scalar, mtet::EdgeId> e0,
+                       std::pair<mtet::Scalar, mtet::EdgeId> e1)
+        { return e0.first < e1.first; };
+        std::vector<std::pair<mtet::Scalar, mtet::EdgeId>> Q;
+        auto push_longest_edge = [&](mtet::TetId tid, mtet::Scalar longest_bound)
+        {
+            std::span<mtet::VertexId, 4> vs = grid.get_tet(tid);
+            mtet::EdgeId longest_edge;
+            mtet::Scalar longest_edge_length = 0;
+            grid.foreach_edge_in_tet(tid, [&](mtet::EdgeId eid, mtet::VertexId v0, mtet::VertexId v1)
+                                     {
+                auto p0 = grid.get_vertex(v0);
+                auto p1 = grid.get_vertex(v1);
+                mtet::Scalar l = (p0[0] - p1[0]) * (p0[0] - p1[0]) + (p0[1] - p1[1]) * (p0[1] - p1[1]) +
+                (p0[2] - p1[2]) * (p0[2] - p1[2]);
+                if (l > longest_edge_length) {
+                    longest_edge_length = l;
+                    longest_edge = eid;
+                } });
+            if (longest_edge_length > longest_bound){
+                Q.emplace_back(longest_edge_length, longest_edge);
+                return true;
+            }
+            return false;
+        };
+        grid.seq_foreach_tet([&](mtet::TetId tid, [[maybe_unused]] std::span<const mtet::VertexId, 4> vs)
+                             { push_longest_edge(tid, longest_edge); });
+        std::make_heap(Q.begin(), Q.end(), comp);
+        while (!Q.empty())
+        {
+            std::pop_heap(Q.begin(), Q.end(), comp);
+            auto [edge_length, eid] = Q.back();
+            if (!grid.has_edge(eid)){
+                Q.pop_back();
+                continue;
+            }
+            Q.pop_back();
+            auto [vid, eid0, eid1] = grid.split_edge(eid);
+            grid.foreach_tet_around_edge(eid0, [&](mtet::TetId tid)
+                                         {
+                if (push_longest_edge(tid, longest_edge)) {
+                    std::push_heap(Q.begin(), Q.end(), comp);
+                } });
+            grid.foreach_tet_around_edge(eid1, [&](mtet::TetId tid)
+                                         {
+                if (push_longest_edge(tid, longest_edge)) {
+                    std::push_heap(Q.begin(), Q.end(), comp);
+                } });
+        }
+        return grid;
+    }
+
     // load tet mesh from json file
     mtet::MTetMesh load_tet_mesh(const std::string &filename) {
         using json = nlohmann::json;
@@ -179,12 +273,10 @@ namespace grid_mesh {
         for (auto &t: tets) {
             mesh.add_tet(vertex_ids[t[0]], vertex_ids[t[1]], vertex_ids[t[2]], vertex_ids[t[3]]);
         }
-        // mesh.initialize_connectivity();
         return mesh;
     }
 
 
 } // namespace grid_mesh
 
-#endif //ADAPTIVE_MESH_REFINEMENT_GRID_MESH_H
 
