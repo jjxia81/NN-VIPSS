@@ -12,6 +12,7 @@ The primary function of this program is to predict the normal as well as the und
 
 Currently, the code is tested on Ubuntu OS 24.04, it should work at other platforms with minor modification. If you are not familiar with compilation on windows, we provide a pre-compiled [binary files](https://gowustl-my.sharepoint.com/:u:/g/personal/jianjun_x_wustl_edu/Ea108LLPWkJJrr3xBJBVrckB4ipwM4qRdXkxsJRkugdTmQ?e=cJ3dQI) for you to try. 
 
+To build on MacOS, a [fork](https://github.com/yig/NN-VIPSS) by Yotam Gingold might be helpful.
 
 BUILDING
 ======================================================================================================
@@ -28,7 +29,7 @@ The code need dependencies:
 
 Install Openblass from source with OpenMP enabled first, then Amardillo and other libs. If using Windows, switch windows branch first and vcpkg is preferred to install the libs except OpenBlas, as you need to recompile the lib with USE_OPENMP on; pico header files are already in the source code. When compiling with Visual Studio, please set C++ version to 20+ and enable OpenMP support.   
 
-To build on MacOS, a [fork](https://github.com/yig/NN-VIPSS) by Yotam Gingold might be helpful.
+
 
 <!-- You can download & install them by yourself, or run the env.sh script which will install homebrew first.
 $source env.sh   -->
