@@ -28,6 +28,8 @@ The code need dependencies:
 
 Install Openblass from source with OpenMP enabled first, then Amardillo and other libs. If using Windows, switch windows branch first and vcpkg is preferred to install the libs except OpenBlas, as you need to recompile the lib with USE_OPENMP on; pico header files are already in the source code. When compiling with Visual Studio, please set C++ version to 20+ and enable OpenMP support.   
 
+To build on MacOS, a [fork](https://github.com/yig/NN-VIPSS) by Yotam Gingold might be helpful.
+
 <!-- You can download & install them by yourself, or run the env.sh script which will install homebrew first.
 $source env.sh   -->
 
