@@ -42,6 +42,8 @@ class VIPSSUnit {
 
         void SolveOptimizaiton();
         void BuildNNHRBFFunctions();
+        void BuildNNHRBFFunctions(const std::vector<double>& pts, const std::vector<double>& normals, const std::string& out_mesh_path);
+        void TestNNHRBFFunctions(const std::string& in_pt_path, const std::string& out_mesh_path);
         void CompareMeshDiff( std::shared_ptr<RBF_Core> rbf_func);
 
         void AdaptiveGridHRBF(std::shared_ptr<RBF_Core> rbf_func, 

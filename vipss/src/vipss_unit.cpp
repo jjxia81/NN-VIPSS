@@ -554,6 +554,57 @@ void VIPSSUnit::OptUnitVipssNormal(){
     return;
 }
 
+void VIPSSUnit::TestNNHRBFFunctions(const std::string& in_pt_path, const std::string& out_mesh_path)
+{
+    std::vector<double> pts;
+    std::vector<double> normals;
+    readXYZnormal(in_pt_path, pts, normals);
+    BuildNNHRBFFunctions(pts, normals, out_mesh_path);
+}
+
+
+void VIPSSUnit::BuildNNHRBFFunctions(const std::vector<double>& pts, const std::vector<double>& normals, const std::string& out_mesh_path)
+{
+    LocalVipss local_vipss;
+    local_vipss.Init(pts);
+    local_vipss.voro_gen_.GenerateVoroData();
+    local_vipss.voro_gen_.SetInsertBoundaryPtsToUnused();
+    std::cout << " build voronoi success ! " << std::endl;
+    local_vipss.voro_gen_.BuildTetMeshTetCenterMap();
+    local_vipss.voro_gen_.BuildPicoTree();
+    std::cout << " build pico tree success ! " << std::endl;
+    
+    local_vipss.voro_gen_.insert_boundary_pts_.clear();
+    local_vipss.out_normals_ = normals;
+    std::vector<double> func_vals(normals.size()/3, 0);
+    local_vipss.s_vals_ = func_vals;
+    local_vipss.user_lambda_ = 0;
+    local_vipss.BuildHRBFPerNode();
+    local_vipss.SetThis(); 
+    std::array<size_t,3> resolution = {3, 3, 3};
+    std::vector<std::shared_ptr<ImplicitFunction<double>>> functions;
+    std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<HRBFDistanceFunction>(0);
+    functions.push_back(hrbf_func);
+    auto t000 = Clock::now();   
+    std::vector<std::array<double, 3> > output_vertices;
+    std::vector<std::array<size_t, 3> > output_triangles;
+    GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
+                            local_vipss_.voro_gen_.bbox_max_, out_dir_,  
+                            file_name_,  functions, 0.01, output_vertices, output_triangles);
+    auto t001 = Clock::now();
+
+    // for(auto& pt : output_vertices)
+    // {
+    //     pt[0] = pt[0] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[0];
+    //     pt[1] = pt[1] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[1];
+    //     pt[2] = pt[2] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[2];
+    // }
+    SaveMeshToPly(out_mesh_path, output_vertices, output_triangles);
+}
+
+
+
+
 void VIPSSUnit::BuildNNHRBFFunctions()
 {
     auto t000 = Clock::now();

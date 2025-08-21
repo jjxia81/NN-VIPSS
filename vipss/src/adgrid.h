@@ -42,6 +42,8 @@ public:
         double gradient[3];
         double dist_val = LocalVipss::NNDistGradient(newPt, gradient) - offset_;
 
+        // std::cout <<  "  dist_val : " << dist_val << std::endl;
+
         // std::cout << "dist_val0 : " << dist_val0 << "  dist_val : " << dist_val << std::endl;
         
         gx = gradient[0];
