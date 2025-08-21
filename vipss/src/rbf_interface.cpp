@@ -8,7 +8,7 @@
 #include <ctime>
 #include <chrono>
 #include<algorithm>
-#include "ImplicitedSurfacing.h"
+// #include "ImplicitedSurfacing.h"
 typedef std::chrono::high_resolution_clock Clock;
 
 using namespace std;
@@ -105,18 +105,16 @@ void RBF_Core::OptNormal(int method){
 
 
 void RBF_Core::Surfacing(int method, int n_voxels_1d){
+    // n_evacalls = 0;
+    // Surfacer sf;
+    // SetThis();
+    // std::cout << "n_voxels_1d " << n_voxels_1d << std::endl;
+    // surf_time = sf.Surfacing_Implicit(pts, n_voxels_1d, false, RBF_Core::Dist_Function);
+    // // surf_time = sf.Surfacing_Implicit(pts, n_voxels_1d, false, this->Dist_Function);
 
-    n_evacalls = 0;
-    Surfacer sf;
-    SetThis();
-    std::cout << "n_voxels_1d " << n_voxels_1d << std::endl;
-    surf_time = sf.Surfacing_Implicit(pts, n_voxels_1d, false, RBF_Core::Dist_Function);
-    // surf_time = sf.Surfacing_Implicit(pts, n_voxels_1d, false, this->Dist_Function);
-
-    sf.WriteSurface(finalMesh_v,finalMesh_fv);
-    if(open_debug_log)
-    cout<<"n_evacalls: "<<n_evacalls<<" ave: "<<surf_time/n_evacalls<<endl;
-
+    // sf.WriteSurface(finalMesh_v,finalMesh_fv);
+    // if(open_debug_log)
+    // cout<<"n_evacalls: "<<n_evacalls<<" ave: "<<surf_time/n_evacalls<<endl;
 }
 
 

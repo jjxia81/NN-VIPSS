@@ -751,45 +751,45 @@ void VIPSSUnit::BuildNNHRBFFunctions()
 
 void VIPSSUnit::ReconSurface()
 {
-    printf(" start ReconSurface \n");
+    // printf(" start ReconSurface \n");
     if(LOCAL_HRBF_NN == hrbf_type_)
     {
-        auto t000 = Clock::now();
-        size_t n_voxels_1d = volume_dim_;
-        std::cout << "pt size " << local_vipss_.out_pts_.size() << std::endl;
-        Surfacer sf;
-        int closet_id = 0;
-        double closet_dist = std::numeric_limits<double>::max();
-        for(int id = 0; id < s_func_vals_.size(); ++id)
-        {
-            if( closet_dist > abs(s_func_vals_[id]))
-            {
-                closet_dist = s_func_vals_[id];
-                closet_id = id;
-            }
-        }
-        sf.closet_id = closet_id;
-        auto surf_time = sf.Surfacing_Implicit(local_vipss_.out_pts_, n_voxels_1d, false, LocalVipss::NNDistFunction);
-        auto t004 = Clock::now();
-        sf.WriteSurface(finalMesh_v_,finalMesh_fv_);
-        auto t005 = Clock::now();
-        double surface_file_save_time = std::chrono::nanoseconds(t005 - t004).count() / 1e9;
-        double total_surface_time = std::chrono::nanoseconds(t004 - t000).count() / 1e9;
-        writePLYFile_VF(out_surface_path_, finalMesh_v_, finalMesh_fv_);
-        std::cout << "------- tet search time "<< tetgenmesh::tet_search_time_st << std::endl;
-        std::cout << "------- voxel pt ave nn num "<< LocalVipss::ave_voxel_nn_pt_num_ / LocalVipss::DistCallNum << std::endl;
-        printf("------- nn search time: %f \n", local_vipss_.search_nn_time_sum_);
-        printf("------- cal nn coordinate and hrbf time: %f \n", local_vipss_.pass_time_sum_);
-        printf(" ------ voxel dist func val evaluated count : %d  \n", LocalVipss::DistCallNum);
-        printf(" ------ voxel dist func val evaluated time : %f \n", LocalVipss::DistCallTime);
-        printf("------- total surface time: %f \n", total_surface_time);
-        G_VP_stats.neighbor_search_time_ += local_vipss_.search_nn_time_sum_;
-        G_VP_stats.cal_nn_coordinate_and_hbrf_time_ += local_vipss_.pass_time_sum_;
-        G_VP_stats.voxel_cal_num += LocalVipss::DistCallNum;
-        G_VP_stats.nn_evaluate_count_ = LocalVipss::DistCallNum;
-        G_VP_stats.average_neighbor_num_ = double(LocalVipss::ave_voxel_nn_pt_num_)/ double(LocalVipss::DistCallNum);
-        // G_VP_stats.surface_total_time_ += total_surface_time;
-        G_VP_stats.surface_total_time_ = total_surface_time;
+    //     auto t000 = Clock::now();
+    //     size_t n_voxels_1d = volume_dim_;
+    //     std::cout << "pt size " << local_vipss_.out_pts_.size() << std::endl;
+    //     Surfacer sf;
+    //     int closet_id = 0;
+    //     double closet_dist = std::numeric_limits<double>::max();
+    //     for(int id = 0; id < s_func_vals_.size(); ++id)
+    //     {
+    //         if( closet_dist > abs(s_func_vals_[id]))
+    //         {
+    //             closet_dist = s_func_vals_[id];
+    //             closet_id = id;
+    //         }
+    //     }
+    //     sf.closet_id = closet_id;
+    //     auto surf_time = sf.Surfacing_Implicit(local_vipss_.out_pts_, n_voxels_1d, false, LocalVipss::NNDistFunction);
+    //     auto t004 = Clock::now();
+    //     sf.WriteSurface(finalMesh_v_,finalMesh_fv_);
+    //     auto t005 = Clock::now();
+    //     double surface_file_save_time = std::chrono::nanoseconds(t005 - t004).count() / 1e9;
+    //     double total_surface_time = std::chrono::nanoseconds(t004 - t000).count() / 1e9;
+    //     writePLYFile_VF(out_surface_path_, finalMesh_v_, finalMesh_fv_);
+    //     std::cout << "------- tet search time "<< tetgenmesh::tet_search_time_st << std::endl;
+    //     std::cout << "------- voxel pt ave nn num "<< LocalVipss::ave_voxel_nn_pt_num_ / LocalVipss::DistCallNum << std::endl;
+    //     printf("------- nn search time: %f \n", local_vipss_.search_nn_time_sum_);
+    //     printf("------- cal nn coordinate and hrbf time: %f \n", local_vipss_.pass_time_sum_);
+    //     printf(" ------ voxel dist func val evaluated count : %d  \n", LocalVipss::DistCallNum);
+    //     printf(" ------ voxel dist func val evaluated time : %f \n", LocalVipss::DistCallTime);
+    //     printf("------- total surface time: %f \n", total_surface_time);
+    //     G_VP_stats.neighbor_search_time_ += local_vipss_.search_nn_time_sum_;
+    //     G_VP_stats.cal_nn_coordinate_and_hbrf_time_ += local_vipss_.pass_time_sum_;
+    //     G_VP_stats.voxel_cal_num += LocalVipss::DistCallNum;
+    //     G_VP_stats.nn_evaluate_count_ = LocalVipss::DistCallNum;
+    //     G_VP_stats.average_neighbor_num_ = double(LocalVipss::ave_voxel_nn_pt_num_)/ double(LocalVipss::DistCallNum);
+    //     // G_VP_stats.surface_total_time_ += total_surface_time;
+    //     G_VP_stats.surface_total_time_ = total_surface_time;
 
     } else {
         rbf_api_.user_lambda_ = user_lambda_;
@@ -807,7 +807,7 @@ void VIPSSUnit::GenerateAdaptiveGrid()
 {
     // std::cout << " test val " << test_val << std::endl;
     std::array<size_t,3> resolution = {3, 3, 3};
-    std::vector<shared_ptr<ImplicitFunction<double>>> functions;
+    std::vector<std::shared_ptr<ImplicitFunction<double>>> functions;
     // load_functions(args.function_file, functions);
 
     if(use_global_hrbf_)
@@ -877,7 +877,7 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
                     std::vector<std::array<size_t, 3> >& output_triangles)
 {
     std::array<size_t,3> resolution = {3, 3, 3};
-    std::vector<shared_ptr<ImplicitFunction<double>>> functions;
+    std::vector<std::shared_ptr<ImplicitFunction<double>>> functions;
     using Vec3 = Eigen::Matrix<double, 3, 1>;
     using Vec4 = Eigen::Matrix<double, 4, 1>;
 
@@ -1025,33 +1025,6 @@ void VIPSSUnit::Run()
         BuildNNHRBFFunctions();
     }
     
-    // 
-    if(LocalVipss::use_octree_sample_)
-    {
-        auto new_pts = local_vipss_.octree_leaf_pts_;
-        auto ts00 = Clock::now();
-        const auto&pts = local_vipss_.octree_split_leaf_pts_;
-        // const auto&pts = local_vipss_.octree_leaf_pts_;
-        std::cout << "split pts size : " << pts.size()/3 << std::endl;
-        for(int i =0; i < pts.size()/3; ++i)
-        {
-            // printf("cur pt  : %f %f %f \n", pts[3*i], pts[3*i + 1], pts[3*i + 2] );
-            R3Pt cur_pt(pts[3*i], pts[3*i + 1], pts[3*i + 2]);
-            double cur_dist = LocalVipss::NNDistFunction(cur_pt);
-            // printf("cur dist : %f \n", cur_dist );
-            if(abs(cur_dist) > distfunc_threshold_)
-            {
-                new_pts.push_back(pts[3*i]);
-                new_pts.push_back(pts[3*i + 1]);
-                new_pts.push_back(pts[3*i + 2]);
-            }
-        }
-        auto ts01 = Clock::now();
-        double total_time = std::chrono::nanoseconds(ts01 - ts00).count()/1e9;
-        printf("------- remaining pts dist function evaluation time : %f ! \n", total_time);
-        // std::string octree_sample_path = out_dir_  + file_name_ +  "_octree_distSample.xyz";
-        // writeXYZ(octree_sample_path, new_pts);
-    }
 
     auto t01 = Clock::now();
     double total_time = std::chrono::nanoseconds(t01 - t00).count()/1e9;
@@ -1115,18 +1088,9 @@ void VIPSSUnit::Run()
     // is_surfacing_ = false;
     if (is_surfacing_)
     {
-    
-        // std::string vipss_pt_path = "../../out/torus/torus_two_parts_out_normal.ply";
-        if(use_adgrid_)
-        {
-            VoronoiGen::cluster_init_pids_.clear();
-            GenerateAdaptiveGrid();
-        } else {
-            ReconSurface();
-        }  
+        VoronoiGen::cluster_init_pids_.clear();
+        GenerateAdaptiveGrid();
         local_vipss_.voro_gen_.SetInsertBoundaryPtsToUnused();
-        // if(make_nn_const_neighbor_num_)
-        // local_vipss_.voro_gen_.SetInsertBoundaryPtsToUnused();
     }
     // test_vipss_timing::test_local_vipss(input_data_path_);
     // test_vipss_timing::visual_distval_pt(input_data_path_, 200);
@@ -1136,72 +1100,4 @@ void VIPSSUnit::Run()
 
     // std::string out_csv_re_file = out_dir_ + file_name_ + "_res.txt";
     // WriteVectorValsToCSV(out_csv_re_file, G_VP_stats.residuals_);
-}
-
-void VIPSSUnit::CalEnergyWithGtNormal()
-{
-    std::string norm_path = "";
-    std::vector<double> vertices;
-    std::vector<double> normals;
-    readPLYFile(norm_path, vertices, normals);
-    if(user_lambda_ <= 1e-12)
-    {
-        size_t n = vertices.size()/3;
-        Eigen::VectorXd arma_x(n*3);
-        for(int i=0;i<n;++i){
-            // auto p_scsc = sina_cosa_sinb_cosb.data()+i*4;
-            arma_x(i)     = normals[3*i];
-            arma_x(i+n)   = normals[3*i + 1];
-            arma_x(i+n*2) = normals[3*i + 2];
-        }
-        Eigen::VectorXd a2 = (arma_x.transpose() * local_vipss_.final_h_eigen_).transpose();
-        double re = arma_x.dot(a2);
-        std::cout << "final residual val : " << re << std::endl;
-    } else {
-        size_t n = vertices.size()/3;
-        Eigen::VectorXd arma_x(n*4);
-        for(int i=0;i<n;++i){
-            // auto p_scsc = sina_cosa_sinb_cosb.data()+i*4;
-            arma_x(i)       = s_func_vals_[i];
-            arma_x(i + n)   = normals[3*i];
-            arma_x(i + n*2) = normals[3*i + 1];
-            arma_x(i + n*3) = normals[3*i + 2];
-        }
-
-        Eigen::VectorXd a2 = (arma_x.transpose() * local_vipss_.final_h_eigen_).transpose();
-        double re = arma_x.dot(a2);
-        std::cout << "final residual val : " << re << std::endl;
-    }
-}
-
-void VIPSSUnit::CompareMeshDiff(std::shared_ptr<RBF_Core> rbf_func)
-{
-    std::string mesh_path = "../../out/test/kitten_h004_0.01_mesh_lv.obj";
-    std::vector<double> vertices;
-    std::vector<unsigned int> faces;
-    std::vector<double> normals;
-    readObjFile(mesh_path, vertices, faces, normals);
-    double max_dist = 0.01;
-    std::vector<std::array<double, 3>> vts;
-    std::vector<std::array<double, 3>> colors;
-    std::vector<std::vector<size_t>> out_faces;
-
-    std::cout << " input vertices size : " << vertices.size()/3 << std::endl;
-    for(int i = 0; i < vertices.size()/3; ++i)
-    {
-        double dist = rbf_func->Dist_Function(R3Pt(vertices[3*i], vertices[3*i + 1], vertices[3*i + 2]));
-        double t = min(max_dist, abs(dist)) / max_dist;
-        RGBColor color = ErrorColorBlend(t);
-        vts.push_back({vertices[3*i], vertices[3*i + 1], vertices[3*i + 2]});
-        colors.push_back({color.r, color.g, color.b});
-    }
-    for(int i = 0; i < faces.size()/3; ++i)
-    {
-        out_faces.push_back({faces[3*i], faces[3*i +1], faces[3*i + 2]});
-    }
-
-    std::string out_path = "../../out/test/kitten_h004_0.01_mesh_lv_color.obj";
-    std::cout << "output mesh path : " << out_path << std::endl;
-    writePlyMeshWithColor(out_path, vts, colors, out_faces);
-
 }

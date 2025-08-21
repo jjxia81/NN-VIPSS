@@ -138,16 +138,16 @@ void visual_grid_pts(const std::string& out_path, const std::vector<Point>& grid
     double max_dist = 0.1;
     for(const auto& pt : grid_pts)
     {
-        double dist_val = func(R3Pt(pt[0], pt[1], pt[2]));
+        double dist_val = func({pt[0], pt[1], pt[2]});
         // double new_dist = max()
         double r, g, b = 0;
         if(dist_val > 0)
         {
-            r = min(max_dist, dist_val) / max_dist;
-            g = (max_dist - min(max_dist, dist_val)) / max_dist;
+            r = std::min(max_dist, dist_val) / max_dist;
+            g = (max_dist - std::min(max_dist, dist_val)) / max_dist;
         } else {
-            b = max(- max_dist, dist_val) / max_dist;
-            g = (max(- max_dist, dist_val) + max_dist) / max_dist;
+            b = std::max(- max_dist, dist_val) / max_dist;
+            g = (std::max(- max_dist, dist_val) + max_dist) / max_dist;
         }
         // double r = dist_val 
         layer_file << "v " << pt[0] << " " << pt[1] << " " <<pt[2] ;
@@ -227,7 +227,7 @@ void test_local_vipss(const std::string& in_path)
     {
         auto t00 = Clock::now();
         auto pt = test_pts[i];
-        dist_vals[i] = LocalVipss::NNDistFunction(R3Pt(pt[0], pt[1], pt[2]));
+        dist_vals[i] = LocalVipss::NNDistFunction({pt[0], pt[1], pt[2]});
         // dist_vals.push_back(dist)
         auto t11 = Clock::now();
         double call_time = std::chrono::nanoseconds(t11 - t00).count()/1e9;

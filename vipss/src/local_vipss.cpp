@@ -101,7 +101,7 @@ void LocalVipss::VisualFuncValues(double (*function)(const R3Pt &in_pt), const V
             pts.push_back(new_pt[0]);
             pts.push_back(new_pt[1]);
             pts.push_back(new_pt[2]);
-            R3Pt pt(new_pt[0], new_pt[1], new_pt[2]);
+            R3Pt pt ={new_pt[0], new_pt[1], new_pt[2]};
             double dist = function(pt);
             double scale = 0.01;
             dist = dist > -scale ? dist : -scale;

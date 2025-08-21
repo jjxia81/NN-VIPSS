@@ -30,14 +30,14 @@ public:
     double evaluate(double x, double y, double z) const override
     {
         // std::cout << "eval pt : " << x << " " << y << " " << z << std::endl;
-        R3Pt newPt(x, y, z);
+        R3Pt newPt = {x, y, z};
         return LocalVipss::NNDistFunction(newPt) - offset_;
     }
 
     double evaluate_gradient(double x, double y, double z, double &gx, double &gy, double &gz) const override
     {
         // std::cout << "pt : " << x << " " << y << " " << z << std::endl;
-        R3Pt newPt(x, y, z);
+        R3Pt newPt = {x, y, z};
         // double dist_val0 = LocalVipss::NNDistFunction(newPt) - offset_;
         double gradient[3];
         double dist_val = LocalVipss::NNDistGradient(newPt, gradient) - offset_;
@@ -131,7 +131,7 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
                             const std::array<double, 3>& bbox_max,
                             const std::string& outdir,
                             const std::string& fillname, 
-                            std::vector<shared_ptr<ImplicitFunction<double>>>& functions,
+                            std::vector<std::shared_ptr<ImplicitFunction<double>>>& functions,
                             double threshold,
                             std::vector<std::array<double, 3> >& output_vertices,
                             std::vector<std::array<size_t, 3> >& output_triangles);

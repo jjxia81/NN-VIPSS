@@ -7,12 +7,13 @@
 #include <iostream>
 #include <vector>
 #include "Solver.h"
-#include "ImplicitedSurfacing.h"
+// #include "ImplicitedSurfacing.h"
 //#include "eigen3/Eigen/Dense"
 #include <armadillo>
 #include <unordered_map>
 // using namespace std;
 typedef unsigned int uint;
+typedef std::array<double,3> R3Pt;
 
 enum RBF_INPUT{
     ON,

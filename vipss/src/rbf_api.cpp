@@ -1,6 +1,7 @@
 #include "rbf_api.h"
 #include <chrono>
 #include "kernel.h"
+#include "readers.h"
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -138,7 +139,7 @@ void RBF_API::run_vipss_for_incremental(std::vector<double> &Vs, size_t key_ptn)
     for(size_t i = 0; i < auxi_n; ++i)
     {
         size_t id = i + key_ptn;
-        R3Pt new_pt(Vs[3*id], Vs[3*id +1], Vs[3*id + 2]);
+        R3Pt new_pt = {Vs[3*id], Vs[3*id +1], Vs[3*id + 2]};
         double dist_val = rbf_core_.Dist_Function(new_pt);
         // p_ids_.push_back(i);
         auxi_dist_vec_(i) = dist_val;
