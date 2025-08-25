@@ -4,7 +4,7 @@ NN-VIPSS - Jianjun Xia (2025)
 
 This code implements the algorithm described in
 
-  **Variational Surface Reconstruction Using Natural Neighbors**  
+  [**Variational Surface Reconstruction Using Natural Neighbors**](https://jjxia81.github.io/NN-VIPSS-Project/) 
    Jianjun Xia, Tao Ju.  
    *ACM Transactions on Graphics (Proc. ACM Siggraph 2025)*  
 
