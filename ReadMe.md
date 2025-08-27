@@ -46,6 +46,11 @@ In the build directory, there should be an executable called "nnvipss" (or "nnvi
 RUNNING
 ======================================================================================================
 
+To run the cases in the paper:
+$cd ./vipss/build  
+$../makefigure.sh
+Output result is saved in "data/ouput" dir, you can replace the default output dir with your created output dir.  
+
 To run the code from the command line, type:
 
 $./nnvipss -i input_file_name [-l user_lambda] [-o output_file_path]
@@ -69,7 +74,6 @@ where:
 
 9. -w : MST weight type, 0 for angle score, 1 for a conbined weight(sqrt(dist) * score), default is 0. You may try 1 if the init normals are not correctly flipped for some tricky cases, especially when the there are large missing part on dense sampling cases.  
  
-
 Some examples have been placed at data folder for testing:
 $./nnvipss -i ../../data/points/doghead.xyz -o {your_own_out_dir}/doghead.ply 
 
