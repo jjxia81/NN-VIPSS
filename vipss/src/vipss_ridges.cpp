@@ -18,6 +18,7 @@ string CalEdgeToken(int a, int b)
 
 std::shared_ptr<RBF_Core> VIPSSRidges::g_hrfb_ptr = std::make_shared<RBF_Core>();
 std::shared_ptr<RBF_Core> VIPSSRidges::hrfb_ptr_ = std::make_shared<RBF_Core>();
+std::string VIPSSRidges::out_dir_ = "./";
 
 VIPSSRidges::Point VIPSSRidges::ori_center_ = {0, 0, 0};
 double VIPSSRidges::scale_ = 1.0;
@@ -468,11 +469,14 @@ bool VIPSSRidges::CalMeshPointsCurvature(std::shared_ptr<RBF_Core> hrfb_ptr,
             pt, gradient, hessian, third_derivs, hrfb_ptr, pt_curvatures[i].tmax_);
         pt_curvatures[i].emin_ = ComputeCurvatureDerivative(
             pt, gradient, hessian, third_derivs, hrfb_ptr, pt_curvatures[i].tmin_);
-
-        pt_curvatures[i].demax_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
-            fourth_derivs, hrfb_ptr, pt_curvatures[i].tmax_, pt_curvatures[i].kmax_, pt_curvatures[i].emax_);
-        pt_curvatures[i].demin_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
-            fourth_derivs, hrfb_ptr, pt_curvatures[i].tmin_, pt_curvatures[i].kmin_, pt_curvatures[i].emin_);
+        if(0)
+        {
+            pt_curvatures[i].demax_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
+                fourth_derivs, hrfb_ptr, pt_curvatures[i].tmax_, pt_curvatures[i].kmax_, pt_curvatures[i].emax_);
+            pt_curvatures[i].demin_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
+                fourth_derivs, hrfb_ptr, pt_curvatures[i].tmin_, pt_curvatures[i].kmin_, pt_curvatures[i].emin_);
+        }
+        
         // pt_curvatures[i].UpdateMax();
     }
     return true;
@@ -497,8 +501,8 @@ void VIPSSRidges::SaveMeshCurvaturesVisualResults(const std::string& out_dir)
         d2_vecs.emplace_back(mesh_pt_curvatures_[i].tmin_);
         e1_vecs.emplace_back(mesh_pt_curvatures_[i].emax_);
         e2_vecs.emplace_back(mesh_pt_curvatures_[i].emin_);
-        de1_vecs.emplace_back(mesh_pt_curvatures_[i].demax_);
-        de2_vecs.emplace_back(mesh_pt_curvatures_[i].demin_);
+        // de1_vecs.emplace_back(mesh_pt_curvatures_[i].demax_);
+        // de2_vecs.emplace_back(mesh_pt_curvatures_[i].demin_);
         double e12 = mesh_pt_curvatures_[i].emax_ * mesh_pt_curvatures_[i].emin_;
         e12_vecs.emplace_back(e12);
     }
@@ -510,10 +514,10 @@ void VIPSSRidges::SaveMeshCurvaturesVisualResults(const std::string& out_dir)
     SaveMeshWithQualityToPly(e1_mesh_path, mesh_points_, e1_vecs, mesh_faces_);
     std::string e2_mesh_path = out_dir + "e2.ply";
     SaveMeshWithQualityToPly(e2_mesh_path, mesh_points_, e2_vecs, mesh_faces_);
-    std::string de1_mesh_path = out_dir + "de1.ply";
-    SaveMeshWithQualityToPly(de1_mesh_path, mesh_points_, de1_vecs, mesh_faces_);
-    std::string de2_mesh_path = out_dir + "de2.ply";
-    SaveMeshWithQualityToPly(de2_mesh_path, mesh_points_, de2_vecs, mesh_faces_);
+    // std::string de1_mesh_path = out_dir + "de1.ply";
+    // SaveMeshWithQualityToPly(de1_mesh_path, mesh_points_, de1_vecs, mesh_faces_);
+    // std::string de2_mesh_path = out_dir + "de2.ply";
+    // SaveMeshWithQualityToPly(de2_mesh_path, mesh_points_, de2_vecs, mesh_faces_);
 
     std::string e12_mesh_path = out_dir + "e12.ply";
     SaveMeshWithQualityToPly(e12_mesh_path, mesh_points_, e12_vecs, mesh_faces_);
@@ -537,9 +541,16 @@ void VIPSSRidges::SaveMeshCurvaturesVisualResults(const std::string& out_dir)
     SavePointsNormalToXYZ(d1_mesh_path, mesh_points_, d1_vecs);
     std::string d2_mesh_path = out_dir + "d2.xyz";
     SavePointsNormalToXYZ(d2_mesh_path, mesh_points_, d2_vecs);
+}
 
-
-    
+void VIPSSRidges::CalSinglePointCurvatureData(const Point& pt, PrincipleCurvature& curvature)
+{
+    std::vector<Point> points = {pt};
+    std::vector<Vec> gradients;
+    CalMeshPointsGradient(hrfb_ptr_, points, gradients);
+    std::vector<PrincipleCurvature> pts_curvature;
+    CalMeshPointsCurvature(hrfb_ptr_, points,gradients,pts_curvature);
+    curvature = pts_curvature[0];
 }
 
 bool VIPSSRidges::CalMeshPointsGradientAndEigenVecs(std::shared_ptr<RBF_Core> rfb_ptr)
@@ -711,11 +722,93 @@ bool VIPSSRidges::CalculateCrestPoints(const Point& pa, const Point& pb,
             interp_gaussian_p_id_ ++;
         }
     } 
-
-
     return true;
 }
 
+double get_cubic_root(double val1, double val2, double g1, double g2) {
+  assert(val1 * val2 < 0);
+
+  // make sure val1 < 0 and val2 > 0
+  if (val1 > 0) {
+    val1 = -val1;
+    val2 = -val2;
+    g1 = -g1;
+    g2 = -g2;
+  }
+
+  // compute the cubic function f(x) = a*x^3 + b*x^2 + c*x + d
+  const double a = g1 + g2 + 2 * (val1 - val2);
+  const double b = 3 * (val2 - val1) - 2 * g1 - g2;
+  const double c = g1;
+  const double d = val1;
+
+  // initial guess: the linear root
+  double x = val1 / (val1 - val2);
+
+  // root finding: combine Halley's method and bisect method
+  // mostly a bisect method, but first find the next guess using Hally's method,
+  // if the guess doesn't lie in the sign-changing interval, use the midpoint of that interval
+  // terminate when the change in x is small
+  double xlo = 0;
+  double xhi = 1;
+  constexpr double x_tol = 1e-4;
+  while (true) {
+    double f = d + x * (c + x * (b + x * a));
+    if (f == 0) {
+      break;
+    }
+    if (f < 0) {
+      xlo = x;
+    } else {
+      xhi = x;
+    }
+    // f'(x) = 3*a*x^2 + 2*b*x + c
+    // f''(x) = 6*a*x + 2*b
+    double df = c + x * (2 * b + x * 3 * a);
+    double ddf = 2 * b + x * 6 * a;
+    double dx = 2 * f * df / (2 * df * df - f * ddf);
+    double x_new = x - dx;
+    if (x_new <= xlo || x_new >= xhi) {
+      x_new = 0.5 * (xlo + xhi);
+    }
+    x = x_new;
+    if (std::abs(dx) < x_tol) {
+      break;
+    }
+  }
+
+  return x;
+}
+
+void InterpolateCrestPoint(const std::array<double,3>& pa, const std::array<double,3>& pb, 
+            const double e_a, const double e_b, std::array<double,3>& interp)
+{
+    double abs_sum = abs(e_a)  + abs(e_b);
+    double px = (abs(e_b) * pa[0] + abs(e_a) * pb[0])/abs_sum;
+    double py = (abs(e_b) * pa[1] + abs(e_a) * pb[1])/abs_sum;
+    double pz = (abs(e_b) * pa[2] + abs(e_a) * pb[2])/abs_sum;
+    interp = {px, py, pz};
+}
+
+void get_cubic_root(const std::array<double, 3>& p1, const std::array<double, 3>& p2,
+                    const double val1, const double val2, const std::array<double, 3>& grad1,
+                    const std::array<double, 3>& grad2,
+                    std::array<double, 3>& interp) {
+    // require val1 and val2 to have different signs
+    assert(val1 * val2 < 0);
+    
+    // directional derivative
+    const std::array<double, 3> p1p2 = {p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]};
+    // since the interval is scaled to (0,1), we don't normalize by dividing by the length of p1p2
+    const double g1 = (grad1[0] * p1p2[0] + grad1[1] * p1p2[1] + grad1[2] * p1p2[2]);
+    const double g2 = (grad2[0] * p1p2[0] + grad2[1] * p1p2[1] + grad2[2] * p1p2[2]);
+    
+    // compute the root
+    const double x = get_cubic_root(val1, val2, g1, g2);
+    interp[0] = p1[0] + x * p1p2[0];
+    interp[1] = p1[1] + x * p1p2[1];
+    interp[2] = p1[2] + x * p1p2[2];
+}
 
 bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb, 
                         const PrincipleCurvature& ca, const PrincipleCurvature& cb,
@@ -743,21 +836,52 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
         eb_max *= -1.0;
     } 
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
-    if(ka_max > abs(ka_min) && kb_max > abs(kb_min) )
+    if(ka_max > abs(ka_min) || kb_max > abs(kb_min) )
     {
         if(ea_max * eb_max < 0)
         {
+            edge_emax_sign = 1;
             // if(ea_max * (arma::dot(pba, ta_max)) > 0)
             {
                 double abs_sum = abs(ea_max)  + abs(eb_max);
-                double px = (abs(eb_max) * pa[0] + abs(ea_max) * pb[0])/abs_sum;
-                double py = (abs(eb_max) * pa[1] + abs(ea_max) * pb[1])/abs_sum;
-                double pz = (abs(eb_max) * pa[2] + abs(ea_max) * pb[2])/abs_sum;
+                // double px = (abs(eb_max) * pa[0] + abs(ea_max) * pb[0])/abs_sum;
+                // double py = (abs(eb_max) * pa[1] + abs(ea_max) * pb[1])/abs_sum;
+                // double pz = (abs(eb_max) * pa[2] + abs(ea_max) * pb[2])/abs_sum;
+                InterpolateCrestPoint(pa, pb, ea_max, eb_max, inter_pa);
                 inter_cur_a = (abs(eb_max) * ka_max+ abs(ea_max) * kb_max)/abs_sum;
-                inter_pa = {px, py, pz};
-                edge_emax_sign = 1;
-                // edge_ridge_pts_.push_back({px, py, pz});
+                Point new_pa = pa;
+                Point new_pb = pb;
+                // std::cout << " inter p coord : " << inter_pa[0] << " " << inter_pa[1] << " " << inter_pa[2] << std::endl;
+                int loop_num = 0;
+                for(int loop_id = 0; loop_id < loop_num; ++loop_id)
+                {
+                    PrincipleCurvature intera_curva;
+                    CalSinglePointCurvatureData(inter_pa, intera_curva);
+                    auto t_interp_max = intera_curva.tmax_;
+                    auto e_interp_max = intera_curva.emax_;
+                    if(arma::dot(ta_max, t_interp_max) < 0)
+                    {
+                        t_interp_max *= -1.0;
+                        e_interp_max *= -1.0;
+                    } 
+                    Point new_interp_p;
+                    if(ea_max * e_interp_max <= 0)
+                    {
+                        InterpolateCrestPoint(new_pa, inter_pa, ea_max, e_interp_max, new_interp_p);
+                        eb_max = e_interp_max;
+                        new_pb = new_interp_p; 
+                    } else {
+                        InterpolateCrestPoint(new_pb, inter_pa, eb_max, e_interp_max, new_interp_p);
+                        ea_max = e_interp_max;
+                        new_pa = new_interp_p;
+                    }
+                    inter_pa = new_interp_p;
+                    // std::cout << " inter p coord " << loop_id << " : " << inter_pa[0] << " " << inter_pa[1] << " " << inter_pa[2] << std::endl;
+                }
                 
+                // inter_pa = {px, py, pz};
+                // edge_emax_sign = 1;
+                // edge_ridge_pts_.push_back({px, py, pz});
                 // edge_ridge_pts_curvature_.push_back(int_curvature);
                 // riges_sign = interp_ridge_p_id_;
                 // interp_ridge_p_id_ ++;
@@ -772,10 +896,11 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
         eb_min *= -1.0;
     } 
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
-    if(abs(ka_min) > abs(ka_max) && abs(kb_min) > abs(kb_max) )
+    if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
     {
         if(ea_min * eb_min < 0)
         {
+            edge_emin_sign = 1;
             // if(ea_min * (arma::dot(pba, ta_min)) > 0)
             {
                 // double t = (- eb_min) / (ea_min - eb_min);
@@ -783,14 +908,41 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
                 // double py = pa[1] + t * (pb[1] - pa[1]);
                 // double pz = pa[2] + t * (pb[2] - pa[2]);
                 double abs_sum = abs(ea_min)  + abs(eb_min);
-                double px = (abs(eb_min) * pa[0] + abs(ea_min) * pb[0])/abs_sum;
-                double py = (abs(eb_min) * pa[1] + abs(ea_min) * pb[1])/abs_sum;
-                double pz = (abs(eb_min) * pa[2] + abs(ea_min) * pb[2])/abs_sum;
-
+                // double px = (abs(eb_min) * pa[0] + abs(ea_min) * pb[0])/abs_sum;
+                // double py = (abs(eb_min) * pa[1] + abs(ea_min) * pb[1])/abs_sum;
+                // double pz = (abs(eb_min) * pa[2] + abs(ea_min) * pb[2])/abs_sum;
                 inter_cur_b = (abs(eb_min) * ka_min+ abs(ea_min) * kb_min) 
                                 /(abs(ea_min)  + abs(eb_min));
-                inter_pb = {px, py, pz};
-                edge_emin_sign = 1;
+                // inter_pb = {px, py, pz};
+
+                InterpolateCrestPoint(pa, pb, ea_min, eb_min, inter_pb);
+                Point new_pa = pa;
+                Point new_pb = pb;
+                int loop_num = 0;
+                for(int loop_id = 0; loop_id < loop_num; ++loop_id)
+                {
+                    PrincipleCurvature intera_curva;
+                    CalSinglePointCurvatureData(inter_pa, intera_curva);
+                    auto t_interp_min = intera_curva.tmin_;
+                    auto e_interp_min = intera_curva.emin_;
+                    if(arma::dot(ta_min, t_interp_min) < 0)
+                    {
+                        t_interp_min *= -1.0;
+                        e_interp_min *= -1.0;
+                    } 
+                    Point new_interp_p;
+                    if(ea_min * e_interp_min <= 0)
+                    {
+                        InterpolateCrestPoint(new_pa, inter_pa, ea_min, e_interp_min, new_interp_p);
+                        eb_min = e_interp_min;
+                        new_pb = new_interp_p;
+                    } else {
+                        InterpolateCrestPoint(new_pb, inter_pa, eb_min, e_interp_min, new_interp_p);
+                        ea_min = e_interp_min;
+                        new_pa = new_interp_p;
+                    }
+                    inter_pa = new_interp_p;
+                }
                 // edge_valley_pts_.push_back({px, py, pz});
                 // edge_valley_pts_curvature_.push_back(int_curvature);
                 // valley_sign = interp_valley_p_id_;
@@ -798,11 +950,161 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
             }
         } 
     }
-
-
     return true;
 }
 
+
+
+bool VIPSSRidges::CalculateCrestPointsSingleWithGrad(const Point& pa, const Point& pb, 
+                        const PrincipleCurvature& ca, const PrincipleCurvature& cb,
+                        int& edge_emax_sign, Point& inter_pa, double& inter_cur_a,
+                        int& edge_emin_sign, Point& inter_pb, double& inter_cur_b)
+{
+    double ka_max = ca.kmax_; double ka_min = ca.kmin_;
+    double kb_max = cb.kmax_; double kb_min = cb.kmin_;
+
+    double ea_max = ca.emax_; double ea_min = ca.emin_;
+    double eb_max = cb.emax_; double eb_min = cb.emin_;
+
+    double eg_a = ea_max * ea_min; 
+    double eg_b = eb_max * eb_min;
+
+    auto ta_max = ca.tmax_;  auto ta_min = ca.tmin_;
+    auto tb_max = cb.tmax_;  auto tb_min = cb.tmin_;
+    auto de1_a  = ca.de1_;   auto de2_a  = ca.de2_;
+    auto de1_b  = cb.de1_;   auto de2_b  = cb.de2_;
+
+    arma::vec pba = {pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]};
+
+    // cal max for ridges 
+    if(arma::dot(ta_max, tb_max) < 0)
+    {
+        tb_max *= -1.0;
+        eb_max *= -1.0;
+        de1_b *= -1.0;
+    } 
+    // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
+    if(ka_max > abs(ka_min) || kb_max > abs(kb_min) )
+    {
+        if(ea_max * eb_max < 0)
+        {
+            edge_emax_sign = 1;
+            // if(ea_max * (arma::dot(pba, ta_max)) > 0)
+            {
+                double abs_sum = abs(ea_max)  + abs(eb_max);
+                // double px = (abs(eb_max) * pa[0] + abs(ea_max) * pb[0])/abs_sum;
+                // double py = (abs(eb_max) * pa[1] + abs(ea_max) * pb[1])/abs_sum;
+                // double pz = (abs(eb_max) * pa[2] + abs(ea_max) * pb[2])/abs_sum;
+                // InterpolateCrestPoint(pa, pb, ea_max, eb_max, inter_pa);
+                get_cubic_root(pa, pb, ea_max, eb_max, {de1_a[0],de1_a[1],de1_a[2]}, {de1_b[0], de1_b[1], de1_b[2]}, inter_pa);
+                inter_cur_a = (abs(eb_max) * ka_max+ abs(ea_max) * kb_max)/abs_sum;
+                Point new_pa = pa;
+                Point new_pb = pb;
+                // std::cout << " inter p coord : " << inter_pa[0] << " " << inter_pa[1] << " " << inter_pa[2] << std::endl;
+                int loop_num = 0;
+                for(int loop_id = 0; loop_id < loop_num; ++loop_id)
+                {
+                    PrincipleCurvature intera_curva;
+                    CalSinglePointCurvatureData(inter_pa, intera_curva);
+                    auto t_interp_max = intera_curva.tmax_;
+                    auto e_interp_max = intera_curva.emax_;
+                    if(arma::dot(ta_max, t_interp_max) < 0)
+                    {
+                        t_interp_max *= -1.0;
+                        e_interp_max *= -1.0;
+
+                    } 
+                    Point new_interp_p;
+                    if(ea_max * e_interp_max <= 0)
+                    {
+                        InterpolateCrestPoint(new_pa, inter_pa, ea_max, e_interp_max, new_interp_p);
+                        // get_cubic_root(pa, pb, ea_max, eb_max, de1_a, de1_b, inter_pa);
+                        eb_max = e_interp_max;
+                        new_pb = new_interp_p; 
+                    } else {
+                        InterpolateCrestPoint(new_pb, inter_pa, eb_max, e_interp_max, new_interp_p);
+                        ea_max = e_interp_max;
+                        new_pa = new_interp_p;
+                    }
+                    inter_pa = new_interp_p;
+                    // std::cout << " inter p coord " << loop_id << " : " << inter_pa[0] << " " << inter_pa[1] << " " << inter_pa[2] << std::endl;
+                }
+                
+                // inter_pa = {px, py, pz};
+                // edge_emax_sign = 1;
+                // edge_ridge_pts_.push_back({px, py, pz});
+                // edge_ridge_pts_curvature_.push_back(int_curvature);
+                // riges_sign = interp_ridge_p_id_;
+                // interp_ridge_p_id_ ++;
+            }
+        } 
+    }
+
+    // cal min for valley 
+    if(arma::dot(ta_min, tb_min) < 0)
+    {
+        tb_min *= -1.0;
+        eb_min *= -1.0;
+        de2_b  *= -1.0;
+    } 
+    // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
+    if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
+    {
+        if(ea_min * eb_min < 0)
+        {
+            edge_emin_sign = 1;
+            // if(ea_min * (arma::dot(pba, ta_min)) > 0)
+            {
+                // double t = (- eb_min) / (ea_min - eb_min);
+                // double px = pa[0] + t * (pb[0] - pa[0]);
+                // double py = pa[1] + t * (pb[1] - pa[1]);
+                // double pz = pa[2] + t * (pb[2] - pa[2]);
+                double abs_sum = abs(ea_min)  + abs(eb_min);
+                // double px = (abs(eb_min) * pa[0] + abs(ea_min) * pb[0])/abs_sum;
+                // double py = (abs(eb_min) * pa[1] + abs(ea_min) * pb[1])/abs_sum;
+                // double pz = (abs(eb_min) * pa[2] + abs(ea_min) * pb[2])/abs_sum;
+                inter_cur_b = (abs(eb_min) * ka_min+ abs(ea_min) * kb_min) 
+                                /(abs(ea_min)  + abs(eb_min));
+                // inter_pb = {px, py, pz};
+
+                // InterpolateCrestPoint(pa, pb, ea_min, eb_min, inter_pb);
+                get_cubic_root(pa, pb, ea_min, eb_min,{de2_a[0],de2_a[1],de2_a[2]}, {de2_b[0], de2_b[1], de2_b[2]}, inter_pb);
+                Point new_pa = pa;
+                Point new_pb = pb;
+                int loop_num = 0;
+                for(int loop_id = 0; loop_id < loop_num; ++loop_id)
+                {
+                    PrincipleCurvature intera_curva;
+                    CalSinglePointCurvatureData(inter_pa, intera_curva);
+                    auto t_interp_min = intera_curva.tmin_;
+                    auto e_interp_min = intera_curva.emin_;
+                    if(arma::dot(ta_min, t_interp_min) < 0)
+                    {
+                        t_interp_min *= -1.0;
+                        e_interp_min *= -1.0;
+                    } 
+                    Point new_interp_p;
+                    if(ea_min * e_interp_min <= 0)
+                    {
+                        InterpolateCrestPoint(new_pa, inter_pa, ea_min, e_interp_min, new_interp_p);
+                        eb_min = e_interp_min;
+                        new_pb = new_interp_p;
+                    } else {
+                        InterpolateCrestPoint(new_pb, inter_pa, eb_min, e_interp_min, new_interp_p);
+                        ea_min = e_interp_min;
+                        new_pa = new_interp_p;
+                    }
+                    inter_pa = new_interp_p;
+                }
+                // edge_valley_pts_.push_back({px, py, pz});
+                // edge_valley_pts_curvature_.push_back(int_curvature);
+                // valley_sign = interp_valley_p_id_;
+                // interp_valley_p_id_ ++;
+            }
+        } 
+    }
+    return true;
+}
 
 
 bool VIPSSRidges::CalculateEdgeRidgeValleyPoints()

@@ -30,6 +30,7 @@ file(GLOB ADGRID_LIST ./adgrid/*.c*)
 file(GLOB ADGRID_LIST ./adgrid/src/*.c*)
 file(GLOB NANOTHREAD_LIST ./adgrid/nanothread/*.c*)
 file(GLOB MSHIO_LIST ./adgrid/mshio/*.c*)
+file(GLOB MTET_LIST ./adgrid/mtet/*.c*)
 file(GLOB PREDICATES_LIST ./adgrid/predicates/predicates.c)
 # set(PREDICATES_LIST ./adgrid/predicates/predicates.c)
 
@@ -41,7 +42,7 @@ find_library(ATOMIC_LIB atomic_ops REQUIRED)
 message(STATUS "MY_VAR is: ${ATOMIC_LIB}")
 # message(STATUS  ${ATOMIC_LIB})
 
-add_library(adgrid ${ADGRID_LIST}  ${NANOTHREAD_LIST} ${MSHIO_LIST} ${PREDICATES_LIST} )
+add_library(adgrid ${ADGRID_LIST}  ${NANOTHREAD_LIST} ${MSHIO_LIST} ${PREDICATES_LIST} ${MTET_LIST})
 
 target_link_libraries(adgrid  nlohmann_json::nlohmann_json atomic)
 

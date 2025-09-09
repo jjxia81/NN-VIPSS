@@ -4,6 +4,7 @@
 #include <optional>
 #include "local_vipss.hpp"
 #include <CLI/CLI.hpp>
+#include "vipss_ridges.h"
 
 // #include "adgrid/timer.h"
 // #include "adgrid/csg.h"
@@ -118,6 +119,12 @@ public:
     {
         offset_ = offset_val;
     }
+
+    void CalPrincipleCurvatures(double *pts)
+    {
+        std::vector<std::array<double,3>> points = {{pts[0], pts[1], pts[2]}}; 
+        // VIPSSRidges::CalMeshPointsCurvature(points);
+    }
     
 
 private:
@@ -129,6 +136,8 @@ private:
 void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution, 
                             const std::array<double, 3>& bbox_min,
                             const std::array<double, 3>& bbox_max,
+                            const int crest_type,
+                            const double tet_size_limit,
                             const std::string& outdir,
                             const std::string& fillname, 
                             std::vector<shared_ptr<ImplicitFunction<double>>>& functions,

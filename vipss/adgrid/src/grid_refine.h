@@ -70,3 +70,19 @@ bool gridRefine(
                 tet_metric &metric_list,
                 std::array<double, timer_amount> profileTimer
                 );
+
+bool gridRefineRidges(
+                const int mode,
+                const int crest_type, 
+                const double tet_max_edge_len,
+                const bool curve_network,
+                const double threshold,
+                const double alpha,
+                const int max_elements,
+                const size_t funcNum,
+                const std::function<llvm_vecsmall::SmallVector<CurvatureData<double>, 20>(std::span<const Scalar, 3>, size_t)> func,
+                const std::function<std::pair<std::array<double, 2>, llvm_vecsmall::SmallVector<int, 20>>(llvm_vecsmall::SmallVector<std::array<double, 2>, 20>)> csg_func,
+                mtet::MTetMesh &grid,
+                tet_metric &metric_list,
+                std::array<double, timer_amount> profileTimer
+                );

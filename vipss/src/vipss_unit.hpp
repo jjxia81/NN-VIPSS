@@ -125,5 +125,7 @@ class VIPSSUnit {
         bool use_input_normal_ = false;
         bool only_use_nn_hrbf_surface_ = false;
         double iso_offset_val_ = 0;
+        int crest_type = 0;
+        double tet_size_limit = 0.001;
         
 };

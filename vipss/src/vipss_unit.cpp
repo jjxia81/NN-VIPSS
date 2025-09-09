@@ -857,12 +857,14 @@ void VIPSSUnit::GenerateAdaptiveGrid()
     } else {
         std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<HRBFDistanceFunction>(iso_offset_val_);
         // hrbf_func->SetIsoOffset(iso_offset_val_);
+        
         functions.push_back(hrbf_func);
         auto t000 = Clock::now();   
         std::vector<std::array<double, 3> > output_vertices;
         std::vector<std::array<size_t, 3> > output_triangles;
         GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
-                                local_vipss_.voro_gen_.bbox_max_, out_dir_,  
+                                local_vipss_.voro_gen_.bbox_max_, crest_type, tet_size_limit,
+                                out_dir_,  
                                 file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
         auto t001 = Clock::now();
 
@@ -911,6 +913,8 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
         max_y = max_y > g_hrbf->pts[3*i + 1] ? max_y : g_hrbf->pts[3*i + 1];
         max_z = max_z > g_hrbf->pts[3*i + 2] ? max_z : g_hrbf->pts[3*i + 2];
     }
+    std::cout << " adgrid min box : " << min_x << " " << min_y << " " << min_z << std::endl;
+    std::cout << " adgrid max box : " << max_x << " " << max_y << " " << max_z << std::endl;
 
     std::array<double,3> bbox_min = {min_x, min_y, min_z};
     std::array<double,3> bbox_max = {max_x, max_y, max_z};
@@ -929,13 +933,14 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
         hrbf_b[i] = g_hrbf->b[i];
     }
     std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<Hermite_RBF<double>>(in_points, hrbf_a, hrbf_b, iso_offset_val_);
+    
     functions.push_back(hrbf_func);
     auto g_t1 = Clock::now();
     auto t000 = Clock::now();
 
-    
+    printf("start adaptive grid generation ...... \n");
       
-    GenerateAdaptiveGridOut(resolution, bbox_min, bbox_max, out_dir_,  
+    GenerateAdaptiveGridOut(resolution, bbox_min, bbox_max, crest_type, tet_size_limit, out_dir_,  
                             file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
     
     auto t001 = Clock::now();
@@ -1316,7 +1321,8 @@ void VIPSSUnit::RunRidgesGHRBF2()
     std::vector<double> pt_normals;
     // readXYZ(input_data_path_, pts);
     readXYZnormal(input_data_path_, pts, pt_normals);
-    NormalizeInputPoints(pts);
+    // NormalizeInputPoints(pts);
+    // local_vipss_.Init(pts);
     
     std::cout << " read input pts size :  " << pts.size() / 3 << std::endl;
     std::shared_ptr<RBF_Core> rfb_ptr = std::make_shared<RBF_Core>();
@@ -1355,15 +1361,19 @@ void VIPSSUnit::RunRidgesGHRBF2()
     // {
     //     output_triangles[i] = {finalMesh_fv_[3*i],  finalMesh_fv_[3*i + 1], finalMesh_fv_[3*i + 2] };
     // }
-
+    vipss_ridges_.hrfb_ptr_ = rfb_ptr;
     vipss_ridges_.g_hrfb_ptr = rfb_ptr;
     AdaptiveGridHRBF(rfb_ptr, output_vertices, output_triangles);
+
+    std::cout << "outvertices :  " << output_vertices.size() << std::endl;
+    std::cout << "output_triangles :  " << output_triangles.size() << std::endl;
+
     
     auto tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh" + std::to_string(user_lambda_)+".ply";
     SaveMeshToPly(tet_mesh_path, output_vertices, output_triangles);
 
-    std::string ridge_mesh_save_path =  "/home/jjxia/Documents/prejects/NN-VIPSS/out/ridge_mesh.ply";
-    std::string valley_mesh_save_path =  "/home/jjxia/Documents/prejects/NN-VIPSS/out/valley_mesh.ply";
+    std::string ridge_mesh_save_path =  out_dir_ + "ridge_mesh.ply";
+    std::string valley_mesh_save_path = out_dir_ + "valley_mesh.ply";
 
     std::vector<std::array<double, 3>> ridge_mesh_pts;
     std::vector<std::array<double, 3>> valley_mesh_pts;

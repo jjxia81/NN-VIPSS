@@ -1939,7 +1939,7 @@ void SaveTetMeshToPly(const vector<array<double, 3>>& vertices,
         double pz = vertices[e[0]][2] / 2.0 +  vertices[e[1]][2] / 2.0;
         
         // outFile << px << " " << py << " " << pz ;
-        if(values[e[0]] * values[e[1]] <= 0)
+        // if(values[e[0]] * values[e[1]] <= 0)
         {
             double value = (values[e[0]] + values[e[1]]) /2.0;
             v_values.push_back(value);

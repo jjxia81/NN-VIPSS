@@ -38,7 +38,7 @@ R4VectorTC<Coord>::operator -= ( const R4VectorTC<Coord>& v )
     dx -= v.dx;
     dy -= v.dy;
     dz -= v.dz;
-    dw -= v.d2;
+    dw -= v.dw;
     return *this;
 }
 

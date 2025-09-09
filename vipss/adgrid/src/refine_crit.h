@@ -13,6 +13,35 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <Eigen/LU>
+#include "implicit_functions/Hermite_RBF.h"
+#include <fstream>
+
+class OutTetObj{
+
+    public:
+        OutTetObj(){};
+        ~OutTetObj(){};
+
+        void AddNewTet(const Eigen::Matrix<double, 4, 3> &pts);
+        void SaveTetDataToObj(const std::string& out_path);
+
+    public:
+
+    std::vector<std::array<double,3>> pts_;
+    std::vector<std::array<int, 2>> edges_; 
+    std::vector<std::array<int,3>> faces_;
+    static OutTetObj unoriented_tets;
+    static OutTetObj unoriented_tets_split;
+    static OutTetObj unoriented_tets_unsplit;
+    static OutTetObj limit_unorientable_tets;
+    static OutTetObj limit_orientable_tets;
+    static OutTetObj rv_failed_tets;
+    static OutTetObj threshold_tets;
+    
+};
+
+
+
 
 /// Enums for the current settings of implicit complexes
 enum geo_obj {
@@ -38,11 +67,23 @@ enum geo_obj {
 ///  i.e., passing the zero-crossing test and contains error greater than `threshold`.
 ///
 bool critIA(const Eigen::Matrix<double, 4, 3> &pts,
-            const std::array<llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>,4> tet_info,
+            const std::array<llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>,4>& tet_info,
             const size_t funcNum,
             const double threshold,
             const bool curve_network,
             bool &active,
+            int &sub_call_two,
+            int &sub_call_three);
+
+bool critIARidge(
+            const Eigen::Matrix<double, 4, 3> &pts,
+            const std::array<llvm_vecsmall::SmallVector<CurvatureData<double>, 20>,4>& tet_info,
+            const size_t funcNum,
+            const double threshold,
+            const bool curve_network,
+            const int crest_type,
+            bool& active,
+            bool& orientable,
             int &sub_call_two,
             int &sub_call_three);
 
@@ -51,7 +92,7 @@ bool critIA(const Eigen::Matrix<double, 4, 3> &pts,
 ///
 ///
 bool critCSG(const Eigen::Matrix<double, 4, 3> &pts,
-             const std::array<llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>,4> tet_info,
+             const std::array<llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>,4>& tet_info,
              const size_t funcNum,
              const std::function<std::pair<std::array<double, 2>, llvm_vecsmall::SmallVector<int, 20>>(llvm_vecsmall::SmallVector<std::array<double, 2>, 20>)> csg_func,
              const double threshold,
@@ -63,7 +104,7 @@ bool critCSG(const Eigen::Matrix<double, 4, 3> &pts,
 /// This function performs two checks (zero-crossing and distance checks) under the setting of material interface (MI) and its curve network.
 /// The parameters follow the same as in `critIA`. see above.
 bool critMI(const Eigen::Matrix<double, 4, 3> &pts,
-            const std::array<llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>,4> tet_info,
+            const std::array<llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>,4>& tet_info,
             const size_t funcNum,
             const double threshold,
             const bool curve_network,

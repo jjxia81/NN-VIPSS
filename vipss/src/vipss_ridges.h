@@ -35,6 +35,8 @@ struct PrincipleCurvature{
         double emax_, emin_ = 0;
         double demax_, demin_ = 0;
         double gaussain_e = 0;
+        arma::vec3 de1_;
+        arma::vec3 de2_;
         arma::vec3 t_max_;
         PrincipleCurvature(){}
         PrincipleCurvature(double k1, double k2, const arma::vec3& t1, const arma::vec3& t2)
@@ -144,6 +146,9 @@ class VIPSSRidges{
                                         const std::vector<Point>& points,
                                         const std::vector<Vec>& gradients,
                                         std::vector<PrincipleCurvature>& pt_curvatures);
+    static void CalSinglePointCurvatureData(const Point& pt, PrincipleCurvature& curvature);
+ 
+    
     // bool CalMeshPointsCurvature(std::shared_ptr<RBF_Core> rfb_ptr);
     // bool CalMeshPointsCurvatureDerivatives(std::shared_ptr<RBF_Core> rfb_ptr);
     bool CalculateEdgeRidgeValleyPoints();
@@ -157,6 +162,10 @@ class VIPSSRidges{
     // static bool CalculateCrestPoints2(const Point& pa, const Point& pb, 
     //                     const PrincipleCurvature& ca, const PrincipleCurvature& cb,
     //                 int& inter_sign, Point& inter_pa);
+    static bool CalculateCrestPointsSingleWithGrad(const Point& pa, const Point& pb, 
+                        const PrincipleCurvature& ca, const PrincipleCurvature& cb,
+                        int& edge_emax_sign, Point& inter_pa, double& inter_cur_a,
+                        int& edge_emin_sign, Point& inter_pb, double& inter_cur_b);
 
     static bool CalculateRidegeEdges(const TriFace& cur_f, 
                         std::unordered_map<string, size_t>& edge_id_map,
@@ -235,7 +244,7 @@ class VIPSSRidges{
     static Point ori_center_;
     static double scale_;
     
-    std::string out_dir_ = "./";
+    static std::string out_dir_;
     std::string file_name_ = "";
     double user_lambda_ = 0.0;
 

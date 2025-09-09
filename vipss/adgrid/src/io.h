@@ -11,10 +11,13 @@
 #include <Eigen/Core>
 #include "adaptive_grid_gen.h"
 #include "timer.h"
+#include "implicit_functions/Hermite_RBF.h"
 
 using namespace mtet;
 
 using IndexMap = ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>>;
+using IndexMapRidge = ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<CurvatureData<double>, 20>>;
+
 
 struct tet_metric {
     size_t total_tet = 0;
@@ -24,6 +27,7 @@ struct tet_metric {
     int two_func_check = 0;
     int three_func_check = 0;
     IndexMap vertex_func_grad_map;
+    IndexMapRidge vertex_func_grad_map_ridge;
     std::vector<mtet::TetId> activeTetId;
 };
 

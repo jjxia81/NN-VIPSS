@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "vipss_ridges.h"
 
 namespace marching3D {
 /**
@@ -300,6 +301,14 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
                    const std::vector<std::array<Float, 3> >& gradients,
                    std::vector<std::array<Float, 3> >& output_vertices,
                    std::vector<std::array<size_t, 3> >& output_triangles);
+
+template <typename Float>
+void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
+                   const std::vector<std::array<size_t, 4> >& tets,
+                //    const std::vector<Float>& values, 
+                //    const std::vector<std::array<Float, 3> >& gradients,
+                   const std::vector<PrincipleCurvature>& pt_curvatures,
+                   const std::string& out_dir); 
 
 // extern template void MarchingTet3D<double>(const std::vector<std::array<double, 3> >& vertices,
 //                                            const std::vector<std::array<size_t, 4> >& tets,

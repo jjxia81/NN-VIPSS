@@ -51,6 +51,8 @@ int main(int argc, char** argv)
         bool use_input_normal = false;
         double iso_offset = 0.0;
         bool cal_ridges = false;
+        int crest_type = 0;
+        double tet_size_limit = 0.001;
         
     }args;
     
@@ -78,6 +80,8 @@ int main(int argc, char** argv)
     app.add_option("--iso_offset", args.iso_offset, " iso offset value for adaptive grid surface ");
     app.add_option("-E, --cal_ridges", args.cal_ridges, " use NN-VIPSS to cal ridges ");
     app.add_option("-r, --ridge_mesh", args.ridge_mesh_path, " input rigde mesh path ");
+    app.add_option("--crest_type", args.crest_type, " adaptive grid refine crest type, 0 for rigde, 1 for valley ");
+    app.add_option("--tet_size_limit", args.tet_size_limit, " adaptive grid refined tet size limit ");
 
     CLI11_PARSE(app, argc, argv);
     // LocalVipss::use_octree_sample_ = args.octree_sample;
@@ -90,6 +94,8 @@ int main(int argc, char** argv)
     vipss_unit.use_input_normal_ = args.use_input_normal;
     vipss_unit.only_use_nn_hrbf_surface_ = args.only_surface;
     vipss_unit.ridge_mesh_path_ = args.ridge_mesh_path;
+    vipss_unit.crest_type = args.crest_type;
+    vipss_unit.tet_size_limit = args.tet_size_limit;
     if(vipss_unit.only_use_nn_hrbf_surface_)
     {
         vipss_unit.use_input_normal_ = true;
