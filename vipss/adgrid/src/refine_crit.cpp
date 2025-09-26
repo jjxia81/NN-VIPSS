@@ -21,6 +21,41 @@ OutTetObj OutTetObj::limit_orientable_tets;
 OutTetObj OutTetObj::rv_failed_tets;
 OutTetObj OutTetObj::threshold_tets;
 
+std::unordered_map<std::string, std::array<std::array<double,4>,2>> tet_edge_mid_ridge_curv_map;
+std::unordered_map<std::string, std::array<double,4>> tet_face_mid_ridge_curv_map;  
+std::unordered_map<std::string, std::array<std::array<double,4>,2>> tet_edge_mid_valle_curv_map;
+std::unordered_map<std::string, std::array<double,4>> tet_face_mid_valle_curv_map; 
+
+// std::unordered_map<std::string, std::array<double,4>> tet_edge_mid_ridge_curv_map_simple;
+// std::unordered_map<std::string, std::array<double,4>> tet_edge_mid_valle_curv_map_simple;
+
+std::unordered_map<std::string, std::array<double,8>> tet_edge_mid_curv_map;
+
+std::unordered_map<std::string, std::array<double,8>>& GetTetEdgeMidSampleMap()
+{
+    return tet_edge_mid_curv_map;
+}
+
+inline std::string generate_tet_edge_key(uint64_t a, uint64_t b)
+{
+    if(a <= b)
+    {
+        return std::to_string(a) + "_" + std::to_string(b);
+    }
+    return std::to_string(b) + "_" + std::to_string(a);
+}
+
+inline std::string generate_tet_edge_key( std::vector<uint64_t>& pids)
+{
+    std::sort(pids.begin(), pids.end());
+    std::string key = std::to_string(pids[0]);
+    for(int i = 1; i < pids.size(); ++i)
+    {
+        key += ("_" + std::to_string(pids[i]));
+    }
+    return key;
+    
+}
 
 constexpr std::array<std::array<int, 2>, 6> CRIT_tet_edges3D = {
         {
@@ -201,8 +236,7 @@ Eigen::Vector<double, 20> bezierConstruct(const Eigen::RowVector4d vals,
     return valList;
 }
 inline bool CheckTetOrientable(Eigen::RowVector4d& vals,
-                        Eigen::Matrix<double, 4, 3>& k_dirs,
-                        Eigen::Matrix<double, 4, 3>& grads)
+                        Eigen::Matrix<double, 4, 3>& k_dirs)
 {
     std::vector<Eigen::Vector3d> dirs(4);
     dirs[0] = k_dirs.row(0);
@@ -212,8 +246,9 @@ inline bool CheckTetOrientable(Eigen::RowVector4d& vals,
         if(dirs[0].dot(dirs[i]) < 0)
         {
             vals[i] *= -1;
-            grads.row(i) *= -1;
+            // grads.row(i) *= -1;
             dirs[i] *= -1;
+            k_dirs.row(i) *= -1.0;
         }
     }
     bool is_k_dir_consistent = true;
@@ -256,6 +291,7 @@ Eigen::Vector<double, 20> bezierConstructRidge( Eigen::RowVector4d& vals,
         // std::cout << " not a consistent oriented tet !" << std::endl;
         is_k_dir_consistent = false;
     } 
+
     Eigen::RowVector3d v0s, v1s, v2s, v3s;
     v0s = grads.row(0) * vec(Eigen::all, {0, 1, 2}) / 3;
     v0s.array() += vals(0);
@@ -304,14 +340,14 @@ Eigen::Vector<double, 20> bezierSampleVals(const Eigen::Matrix<double, 4, 3> &pt
         if(crest_type == 0)
         {
             valList[4 + i] = cur_data.e1_;
-            auto kdir = cur_data.t1_;
+            const auto& kdir = cur_data.t1_;
             if(k_dirs.row(0).dot(kdir) < 0)
             {
                 valList[4 + i] *= -1.0;
             }
         } else {
             valList[4 + i] = cur_data.e2_;
-            auto kdir = cur_data.t1_;
+            const auto& kdir = cur_data.t2_;
             if(k_dirs.row(0).dot(kdir) < 0)
             {
                 valList[4 + i] *= -1.0;
@@ -323,6 +359,285 @@ Eigen::Vector<double, 20> bezierSampleVals(const Eigen::Matrix<double, 4, 3> &pt
     // std::cout << " finished assigned ." << std::endl;
     return valList;
 }
+
+std::vector<std::array<double,3>> CalEdgeInterPts(const std::array<double,3>& pa, const std::array<double,3>& pb)
+{
+    double dx = pb[0] - pa[0];
+    double dy = pb[1] - pa[1];
+    double dz = pb[2] - pa[2];
+
+    double int_a_x = pa[0] + dx /3;
+    double int_a_y = pa[1] + dy /3;
+    double int_a_z = pa[2] + dz /3;
+
+    double int_b_x = pa[0] + dx /3 * 2;
+    double int_b_y = pa[1] + dy /3 * 2;
+    double int_b_z = pa[2] + dz /3 * 2;
+
+    return {{int_a_x, int_a_y, int_a_z}, {int_b_x, int_b_y, int_b_z}};
+} 
+
+
+double  bezierSampleValsWithHash(
+                                        const mtet::TetId tid,
+                                        mtet::MTetMesh &grid_mesh,
+                                        const Eigen::Matrix<double, 4, 3> &pts, 
+                                        const Eigen::RowVector4d& vals, 
+                                        const Eigen::Matrix<double, 4, 3>& k_dirs,
+                                        const int crest_type)
+{
+    auto vs = grid_mesh.get_tet(tid);
+    std::array<uint64_t,4> tet_pids;
+    std::array<std::array<double,3>, 4> tet_pts_coords;
+    for (int i = 0; i < 4; ++i)
+    {
+        auto vid = vs[i];
+        tet_pids[i] = vid.value_of();
+        auto coords = grid_mesh.get_vertex(vid);
+        tet_pts_coords[i] = {coords[0], coords[1], coords[2]};
+    }
+    Eigen::RowVector<double, 16> sample_vals;
+    Eigen::RowVector<double, 16> linear_vals;
+    Eigen::Vector3d k_dir_main = k_dirs.row(0);
+    auto& tet_edge_curv_val_map = crest_type == 0 ? tet_edge_mid_ridge_curv_map : tet_edge_mid_valle_curv_map;
+
+    for(int eid = 0; eid < CRIT_tet_edges3D.size(); ++eid)
+    {   
+        const auto& edge = CRIT_tet_edges3D[eid];
+        uint64_t pa_id = tet_pids[edge[0]];
+        uint64_t pb_id = tet_pids[edge[1]];
+        
+        std::array<double,3> pa = tet_pts_coords[edge[0]];
+        std::array<double,3> pb = tet_pts_coords[edge[1]];
+        double val_a = vals[edge[0]];
+        double val_b = vals[edge[1]];
+        if(pa_id > pb_id)
+        {
+            pa_id = pb_id;
+            pb_id = tet_pids[edge[0]]; 
+            pa = pb;
+            pb = tet_pts_coords[edge[0]];
+            val_a = val_b;
+            val_b = vals[edge[0]];
+        }
+        linear_vals[2*eid]     = val_a + (val_b - val_a) / 3;
+        linear_vals[2*eid + 1] = val_a + (val_b - val_a) / 3 * 2;
+        auto e_key = generate_tet_edge_key(pa_id, pb_id);
+        std::array<std::array<double,4>,2> edge_int_cur_vals;
+        if(tet_edge_curv_val_map.find(e_key) == tet_edge_curv_val_map.end())
+        {
+            auto inter_pts = CalEdgeInterPts(pa, pb);
+            for(int pid = 0; pid < 2; ++pid)
+            {
+                CurvatureData<double> cur_data;
+                const auto& pt = inter_pts[pid];
+                Hermite_RBF<double>::hrbf_ptr_->EvaluateCurvatureData(pt[0], pt[1], pt[2], cur_data);
+                std::array<double,4> curv_vals;
+                if(crest_type == 0)
+                {
+                    if(cur_data.t1_.dot(k_dir_main) < 0)
+                    {
+                        cur_data.t1_ *= -1;
+                        cur_data.e1_ *= -1;
+                    }
+                    curv_vals = {cur_data.e1_, cur_data.t1_[0], cur_data.t1_[1], cur_data.t1_[2]};
+                    edge_int_cur_vals[pid] = curv_vals;
+                } else {
+                    if(cur_data.t2_.dot(k_dir_main) < 0)
+                    {
+                        cur_data.t2_ *= -1;
+                        cur_data.e2_ *= -1;
+                    }
+                    curv_vals = {cur_data.e2_, cur_data.t2_[0], cur_data.t2_[1], cur_data.t2_[2]};
+                    edge_int_cur_vals[pid] = curv_vals;
+                } 
+            }
+            tet_edge_curv_val_map[e_key] = edge_int_cur_vals;
+        }  else {
+            edge_int_cur_vals = tet_edge_curv_val_map[e_key];
+            for(int pid = 0; pid < 2; ++pid)
+            {
+                Eigen::Vector3d cur_k_dir = {edge_int_cur_vals[pid][1], edge_int_cur_vals[pid][2], edge_int_cur_vals[pid][3]};
+                if(cur_k_dir.dot(k_dir_main) < 0)
+                {
+                    edge_int_cur_vals[pid][0] *= -1;
+                    edge_int_cur_vals[pid][1] *= -1;
+                    edge_int_cur_vals[pid][2] *= -1;
+                    edge_int_cur_vals[pid][3] *= -1;
+                }
+            }
+        }
+        sample_vals[2*eid]     = edge_int_cur_vals[0][0];
+        sample_vals[2*eid + 1] = edge_int_cur_vals[1][0];
+    }
+
+    auto& tet_face_curv_val_map = crest_type == 0 ? tet_face_mid_ridge_curv_map : tet_face_mid_valle_curv_map;
+    for(int fid = 0; fid < 4; ++fid)
+    {   
+        const auto& face = CRIT_tet_faces3D[fid];
+        uint64_t pa_id = tet_pids[face[0]];
+        uint64_t pb_id = tet_pids[face[1]];
+        uint64_t pc_id = tet_pids[face[2]];
+        linear_vals[12 + fid] = (vals[face[0]] + vals[face[1]] + vals[face[2]]) / 3;
+        double f_mid_pt_x =  (tet_pts_coords[face[0]][0] +  tet_pts_coords[face[1]][0] + tet_pts_coords[face[2]][0]) / 3;
+        double f_mid_pt_y =  (tet_pts_coords[face[0]][1] +  tet_pts_coords[face[1]][1] + tet_pts_coords[face[2]][1]) / 3;
+        double f_mid_pt_z =  (tet_pts_coords[face[0]][2] +  tet_pts_coords[face[1]][2] + tet_pts_coords[face[2]][2]) / 3;
+
+        std::vector<uint64_t> face_pids = {pa_id, pb_id, pc_id};
+        std::string f_token = generate_tet_edge_key(face_pids);
+        if(tet_face_curv_val_map.find(f_token) == tet_face_curv_val_map.end())
+        {
+            CurvatureData<double> cur_data;
+            Hermite_RBF<double>::hrbf_ptr_->EvaluateCurvatureData(f_mid_pt_x, f_mid_pt_y, f_mid_pt_z, cur_data);
+            double cur_e_val = crest_type == 0? cur_data.e1_ : cur_data.e2_;
+            auto cur_k_dir = crest_type == 0? cur_data.t1_ : cur_data.t2_;
+
+            sample_vals[12 + fid] = k_dir_main.dot(cur_k_dir) < 0 ? -cur_e_val : cur_e_val;
+            tet_face_curv_val_map[f_token] = {cur_e_val, cur_k_dir[0], cur_k_dir[1], cur_k_dir[2]};
+
+        } else {
+            auto vals = tet_face_curv_val_map[f_token];
+            Eigen::RowVector3d cur_k_dir = {vals[1], vals[2], vals[3]};
+            sample_vals[12 + fid] = k_dir_main.dot(cur_k_dir) < 0 ? -vals[0] : vals[0];
+        }
+    }
+
+    Eigen::RowVector<double, 16> diff = sample_vals - linear_vals;
+    double max_diff = std::max(diff.maxCoeff(), - diff.minCoeff()); 
+    // std::cout << " val list 1 : " << sample_vals << std::endl;
+    return max_diff;
+}
+
+
+double  bezierSampleValsWithHashSimple(
+                                        const mtet::TetId tid,
+                                        mtet::MTetMesh &grid_mesh,
+                                        const Eigen::Matrix<double, 4, 3> &pts, 
+                                        const Eigen::RowVector4d& vals, 
+                                        const Eigen::Matrix<double, 4, 3>& k_dirs,
+                                        const int crest_type)
+{
+    auto vs = grid_mesh.get_tet(tid);
+    std::array<uint64_t,4> tet_pids;
+    std::array<std::array<double,3>, 4> tet_pts_coords;
+    for (int i = 0; i < 4; ++i)
+    {
+        auto vid = vs[i];
+        tet_pids[i] = vid.value_of();
+        auto coords = grid_mesh.get_vertex(vid);
+        tet_pts_coords[i] = {coords[0], coords[1], coords[2]};
+    }
+    Eigen::RowVector<double, 6> sample_vals;
+    Eigen::RowVector<double, 6> linear_vals;
+    Eigen::Vector3d k_dir_main = k_dirs.row(0);
+    // auto& tet_edge_curv_val_map = crest_type == 0 ? tet_edge_mid_ridge_curv_map_simple : tet_edge_mid_valle_curv_map_simple;
+        
+    
+    int e_num = int(CRIT_tet_edges3D.size());
+    std::vector<std::string> edge_keys(6);
+    std::vector<std::array<double,8>> edge_mid_e_t_vals(6);
+    #pragma omp parallel for
+    for(int eid = 0; eid < e_num; ++eid)
+    {   
+        const auto& edge = CRIT_tet_edges3D[eid];
+        uint64_t pa_id = tet_pids[edge[0]];
+        uint64_t pb_id = tet_pids[edge[1]];
+        
+        std::array<double,3> pa = tet_pts_coords[edge[0]];
+        std::array<double,3> pb = tet_pts_coords[edge[1]];
+        double val_a = vals[edge[0]];
+        double val_b = vals[edge[1]];
+        if(pa_id > pb_id)
+        {
+            pa_id = pb_id;
+            pb_id = tet_pids[edge[0]]; 
+            pa = pb;
+            pb = tet_pts_coords[edge[0]];
+            val_a = val_b;
+            val_b = vals[edge[0]];
+        }
+        linear_vals[eid] = (val_a + val_b) / 2;
+        auto e_key = generate_tet_edge_key(pa_id, pb_id);
+        edge_keys[eid] = e_key;
+        if(tet_edge_mid_curv_map.find(e_key) == tet_edge_mid_curv_map.end())
+        {
+            double inter_pt_x = (pa[0] + pb[0])/2;
+            double inter_pt_y = (pa[1] + pb[1])/2;
+            double inter_pt_z = (pa[2] + pb[2])/2;
+            CurvatureData<double> cur_data;
+            Hermite_RBF<double>::hrbf_ptr_->EvaluateCurvatureData(inter_pt_x, inter_pt_y, inter_pt_z, cur_data);
+            
+            if(crest_type == 0)
+            {
+                if(cur_data.t1_.dot(k_dir_main) < 0)
+                {
+                    cur_data.t1_ *= -1;
+                    cur_data.e1_ *= -1;
+                }
+            } else {
+                if(cur_data.t2_.dot(k_dir_main) < 0)
+                {
+                    cur_data.t2_ *= -1;
+                    cur_data.e2_ *= -1;
+                }
+            } 
+            edge_mid_e_t_vals[eid] = {cur_data.e1_, cur_data.t1_[0], 
+                                            cur_data.t1_[1], cur_data.t1_[2],
+                                            cur_data.e2_, cur_data.t2_[0], 
+                                            cur_data.t2_[1], cur_data.t2_[2]};
+            sample_vals[eid] = crest_type == 0 ?  edge_mid_e_t_vals[eid][0] : edge_mid_e_t_vals[eid][4];
+        }  else {
+            edge_mid_e_t_vals[eid] = tet_edge_mid_curv_map[e_key];
+            Eigen::Vector3d cur_kmax_dir = {edge_mid_e_t_vals[eid][1], edge_mid_e_t_vals[eid][2], edge_mid_e_t_vals[eid][3]};
+            Eigen::Vector3d cur_kmin_dir = {edge_mid_e_t_vals[eid][5], edge_mid_e_t_vals[eid][6], edge_mid_e_t_vals[eid][7]};
+            auto cur_k_dir = crest_type == 0? cur_kmax_dir : cur_kmin_dir;
+            sample_vals[eid] = crest_type == 0?  edge_mid_e_t_vals[eid][0] : edge_mid_e_t_vals[eid][4];
+            if(cur_k_dir.dot(k_dir_main) < 0)
+            {
+                sample_vals[eid] *= -1;
+            }
+        }
+    }
+    for(int eid =0; eid < e_num; ++eid)
+    {
+        if(tet_edge_mid_curv_map.find(edge_keys[eid]) == tet_edge_mid_curv_map.end())
+        tet_edge_mid_curv_map[edge_keys[eid]] = edge_mid_e_t_vals[eid];
+    }
+    Eigen::RowVector<double, 6> diff = sample_vals - linear_vals;
+    double max_diff = std::max(diff.maxCoeff(), - diff.minCoeff()); 
+    return max_diff;
+}
+
+bool TetDirConsistenceThreshold(const Eigen::Matrix<double, 4, 3>& k_dirs, double threshold)
+{
+    Eigen::Vector3d k_dir0 = k_dirs.row(0);
+    Eigen::Vector3d k_dir1 = k_dirs.row(1);
+    Eigen::Vector3d k_dir2 = k_dirs.row(2);
+    Eigen::Vector3d k_dir3 = k_dirs.row(3);
+
+    k_dir0 = k_dir0 / sqrt(k_dir0.dot(k_dir0));
+    k_dir1 = k_dir1 / sqrt(k_dir1.dot(k_dir1));
+    k_dir2 = k_dir2 / sqrt(k_dir2.dot(k_dir2));
+    k_dir3 = k_dir3 / sqrt(k_dir3.dot(k_dir3));
+
+    Eigen::Vector3d mean_dir = k_dir0 + k_dir1 + k_dir2 + k_dir3;
+    mean_dir = mean_dir / sqrt(mean_dir.dot(mean_dir));
+
+    double d0 = mean_dir.dot(k_dir0);
+    double d1 = mean_dir.dot(k_dir1);
+    double d2 = mean_dir.dot(k_dir2);
+    double d3 = mean_dir.dot(k_dir3);
+
+    double mean_diff = (d0 + d1 + d2 + d3) / 4.0;  
+
+    // Eigen::RowVector3d mean_dir = k_dirs.colwise().mean();
+    // double len = sqrt(mean_dir.dot(mean_dir));
+    // mean_dir = mean_dir / len;
+    // Eigen::VectorXd result = k_dirs * mean_dir.transpose();
+    // return result.mean() > threshold;
+    return mean_diff >= threshold;
+}
+
 
 /// Construct the value differences between linear interpolations and bezier approximations at 16 bezier control points (excluding control points at tet vertices)
 /// @param[in] valList          The eigen vector of 20 bezier values.
@@ -549,6 +864,8 @@ bool critIA(
 bool critIARidge(
             const Eigen::Matrix<double, 4, 3> &pts,
             const std::array<llvm_vecsmall::SmallVector<CurvatureData<double>, 20>,4>& tet_info,
+            const mtet::TetId tid,
+            mtet::MTetMesh &grid_mesh,
             const size_t funcNum,
             const double threshold,
             const bool curve_network,
@@ -615,8 +932,8 @@ bool critIARidge(
         // std::cout << " finish assign curvature data info ..." << std::endl;
         // 0 stands for rigdes, 1 for valleys
         // bool is_target_crest_type = TetCrestTypeTest(kmax_vals, kmin_vals, crest_type);
-        const auto& k_dirs = crest_type == 0 ? k1_dirs : k2_dirs;
-        const auto& e_vals = crest_type == 0 ? emax_vals : emin_vals;
+        auto& k_dirs = crest_type == 0 ? k1_dirs : k2_dirs;
+        auto& e_vals = crest_type == 0 ? emax_vals : emin_vals;
         
         int rv_tet_pt_count = 0;
         bool is_target_crest_type = TetCrestTypeTest2(kmax_vals, kmin_vals, crest_type, rv_tet_pt_count);
@@ -628,61 +945,31 @@ bool critIARidge(
         if(rv_tet_pt_count < 4)
         {
             active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
-            if(active) 
-            {
-                return true;
-            } else {
-                return false;
-            }
+            return active;
         }
-        bool use_two_branch = true;
-        bool is_tet_kdir_consistent = true;
-        Eigen::RowVector4d vals;
+        orientable = CheckTetOrientable(e_vals, k_dirs);
 
-        if(crest_type == 0)
-        {    
-            valList.row(funcIter) = bezierConstructRidge(emax_vals, k1_dirs, grads_eigen_de1, vec, is_tet_kdir_consistent);
-            // is_tet_kdir_consistent = CheckTetOrientable(emax_vals, k1_dirs, grads_eigen_de1);
-            // valList.row(funcIter)  = bezierSampleVals(pts, emax_vals, k1_dirs, crest_type);
-            // std::cout << " vals : " << valList.row(funcIter) << std::endl;
-            // std::cout << " val2 : " << new_vals.transpose() << std::endl;
-            vals = emax_vals;
-        } else {
-            valList.row(funcIter) = bezierConstructRidge(emin_vals, k2_dirs, grads_eigen_de2, vec, is_tet_kdir_consistent);
-            // is_tet_kdir_consistent = CheckTetOrientable(emin_vals, k2_dirs, grads_eigen_de2);
-            valList.row(funcIter) = bezierSampleVals(pts, emin_vals, k2_dirs, crest_type);
-            vals = emin_vals;
-        }
-        orientable = is_tet_kdir_consistent;
-        
-        if(use_two_branch)
+        if(orientable) 
         {
-            if(is_tet_kdir_consistent) 
-            {
-                // active = get_sign(valList.row(funcIter).maxCoeff()) != get_sign(valList.row(funcIter).minCoeff());
-                active = vals.maxCoeff() * vals.minCoeff() < 0;
-            } else {
-                OutTetObj::unoriented_tets.AddNewTet(pts);
-                active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
-            }
+            active = e_vals.maxCoeff() * e_vals.minCoeff() < 0;
         } else {
-            if(!is_tet_kdir_consistent)
-            {
-                OutTetObj::unoriented_tets.AddNewTet(pts);
-            } 
+            OutTetObj::unoriented_tets.AddNewTet(pts);
             // active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
-            
-            // active = get_sign(valList.row(funcIter).maxCoeff()) != get_sign(valList.row(funcIter).minCoeff());
-            active = vals.maxCoeff() * vals.minCoeff() < 0;
+            active = true;
+            return true;
         }
         if(!active) 
         {
             return false;
         }
-        if(!is_tet_kdir_consistent && use_two_branch)
-        {
-            return true;
-        }
+        // valList.row(funcIter) = bezierSampleVals(pts, e_vals, k_dirs, crest_type);
+        // std::cout << " val list 0 : " << valList.row(funcIter) << std::endl;
+        // double dot_threshold = 0.996;
+        // if(active )
+        // {
+        // return !TetDirConsistenceThreshold(k_dirs, dot_threshold);
+        // } 
+     
         // return true;
         // Eigen::Matrix<double, 4, 3> grads_eigen = func_info.rightCols(3);
         // Eigen::Matrix<double, 4, 3> k1_dirs = func_info.middleCols(1, 3);
@@ -702,10 +989,14 @@ bool critIARidge(
             //     active = true;
             // }
             activeNum++;
-            Eigen::Vector3d unNormF = Eigen::RowVector3d(vals(1)-vals(0), vals(2)-vals(0), vals(3)-vals(0)) * crossMatrix.transpose();
+            Eigen::Vector3d unNormF = Eigen::RowVector3d(e_vals(1)-e_vals(0), e_vals(2)-e_vals(0), e_vals(3)-e_vals(0)) * crossMatrix.transpose();
             gradList.row(funcIter) = unNormF;
-            diffList.row(funcIter) = bezierDiff(valList.row(funcIter));
-            double error = std::max(diffList.row(funcIter).maxCoeff(), -diffList.row(funcIter).minCoeff());
+            // diffList.row(funcIter) = bezierDiff(valList.row(funcIter));
+            // double error = std::max(diffList.row(funcIter).maxCoeff(), -diffList.row(funcIter).minCoeff());
+            // std::cout << "error 0  : " << error << std::endl;
+            // double error = bezierSampleValsWithHash(tid, grid_mesh, pts, e_vals, k_dirs, crest_type);
+            double error = bezierSampleValsWithHashSimple(tid, grid_mesh, pts, e_vals, k_dirs, crest_type);
+            // std::cout << "error 1  : " << error << " threshold " << threshold << std::endl;
             //Timer single2_timer(singleFunc, [&](auto profileResult){profileTimer = combine_timer(profileTimer, profileResult);});
             double lhs = error * error * sqD;
             double rhs;

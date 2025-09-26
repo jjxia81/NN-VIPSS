@@ -15,6 +15,7 @@
 #include <Eigen/LU>
 #include "implicit_functions/Hermite_RBF.h"
 #include <fstream>
+#include <mtet/mtet.h>
 
 class OutTetObj{
 
@@ -41,7 +42,7 @@ class OutTetObj{
 };
 
 
-
+std::unordered_map<std::string, std::array<double,8>>& GetTetEdgeMidSampleMap();
 
 /// Enums for the current settings of implicit complexes
 enum geo_obj {
@@ -78,6 +79,8 @@ bool critIA(const Eigen::Matrix<double, 4, 3> &pts,
 bool critIARidge(
             const Eigen::Matrix<double, 4, 3> &pts,
             const std::array<llvm_vecsmall::SmallVector<CurvatureData<double>, 20>,4>& tet_info,
+            const mtet::TetId tid,
+            mtet::MTetMesh &grid_mesh,
             const size_t funcNum,
             const double threshold,
             const bool curve_network,

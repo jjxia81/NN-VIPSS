@@ -6,6 +6,7 @@
 #include <numeric>
 #include "vipss_ridges.h"
 #include "readers.h"
+#include "refine_crit.h"
 
 namespace {
 // lookup table for marching 4-simplices
@@ -1558,8 +1559,9 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
     std::vector<VPoint> emin_inter_pts; 
     std::vector<double> emax_inter_k; 
     std::vector<double> emin_inter_k; 
+    auto tet_edge_mid_sample_map = GetTetEdgeMidSampleMap();
 
-    std::cout << " tets  size " << tets.size() << std::endl;
+    std::cout << " tet_edge_mid_sample_map  size " << tet_edge_mid_sample_map.size() << std::endl;
     for (const auto& tet : tets)
     {
       for(const auto& edge: tet_edges3D)
@@ -1585,10 +1587,40 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
           VPoint inter_pb; 
           double inter_cur_a;
           double inter_cur_b;
-          // VIPSSRidges::CalculateCrestPointsSingle(pa,  pb,  ca,  cb, edge_emax_sign,  
-          //          inter_pa, inter_cur_a, edge_emin_sign, inter_pb,  inter_cur_b);
-          VIPSSRidges::CalculateCrestPointsSingleWithGrad(pa,  pb,  ca,  cb, edge_emax_sign,  
+          bool use_linear_interp = false;
+          if(use_linear_interp)
+          {
+            VIPSSRidges::CalculateCrestPointsSingle(pa,  pb,  ca,  cb, edge_emax_sign,  
                    inter_pa, inter_cur_a, edge_emin_sign, inter_pb,  inter_cur_b);
+          } else {
+            PrincipleCurvature c_mid;
+            if(tet_edge_mid_sample_map.find(e_token) != tet_edge_mid_sample_map.end())
+            {
+              const auto& e_curv_data = tet_edge_mid_sample_map[e_token];
+              c_mid.emax_ = e_curv_data[0];
+              c_mid.tmax_ = {e_curv_data[1], e_curv_data[2], e_curv_data[3]};
+              c_mid.emin_ = e_curv_data[4];
+              c_mid.tmin_ = {e_curv_data[5], e_curv_data[5], e_curv_data[7]};
+              VIPSSRidges::CalculateCrestPointsSingleQuadratic(pa, pb, ca, cb, c_mid, edge_emax_sign,  
+                    inter_pa, inter_cur_a, edge_emin_sign, inter_pb,  inter_cur_b);
+              // std::cout << " find edge token : " << e_token << std::endl; 
+            } else {
+              VIPSSRidges::CalculateCrestPointsSingle(pa,  pb,  ca,  cb, edge_emax_sign,  
+                   inter_pa, inter_cur_a, edge_emin_sign, inter_pb,  inter_cur_b);
+              // std::array<double, 3> p_mid = {
+              //   (pa[0] + pb[0]) / 2.0,
+              //   (pa[1] + pb[1]) / 2.0,
+              //   (pa[2] + pb[2]) / 2.0,
+              // };
+              // VIPSSRidges::CalSinglePointCurvatureData(p_mid,c_mid);
+            }           
+            
+
+          }
+          
+
+          
+    
           if(edge_emax_sign > 0)
           {
             tet_edges_emax_pid.push_back(emax_inter_pts.size());
@@ -1723,6 +1755,7 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
 
 }
 
+
 template void MarchingTet3D<double>(const std::vector<std::array<double, 3> >& vertices,
                                     const std::vector<std::array<size_t, 4> >& tets,
                                     const std::vector<double>& values,
@@ -1749,7 +1782,7 @@ template void MarchingTet3DCrestMesh<double>(const std::vector<std::array<double
                   //  const std::vector<double>& values, 
                   //  const std::vector<std::array<double, 3> >& gradients,
                    const std::vector<PrincipleCurvature>& pt_curvatures,
-                   const std::string& out_dir); 
+                   const std::string& out_di); 
 
 // template void MarchingTet3DEdges<float>(const std::vector<std::array<float, 3> >& vertices,
 //                                    const std::vector<std::array<size_t, 4> >& tets,

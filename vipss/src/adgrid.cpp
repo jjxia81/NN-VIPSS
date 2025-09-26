@@ -36,12 +36,37 @@ bool get_mesh_data(const mtet::MTetMesh& mesh,
     IndexMap vertex_tag_map;
     vertex_tag_map.reserve(mesh.get_num_vertices());
     int counter = 0;
+    // uint64_t max_vid = 0;
+
+    std::cout << " ----- mesh.get_num_vertices() " << mesh.get_num_vertices() << std::endl;
+
     mesh.seq_foreach_vertex([&](VertexId vid, std::span<const Scalar, 3> data){
         size_t vertex_tag = vertex_tag_map.size() + 1;
+        // max_vid = max_vid > value_of(vid) ? value_of(vid) : value_of(vid);
         vertex_tag_map[value_of(vid)] = vertex_tag;
         vertices[counter] = {data[0], data[1], data[2]};
         counter ++;
     });
+    std::unordered_map<std::string, std::array<double,8>> temp_map;
+    auto& tet_edge_mid_sample_map = GetTetEdgeMidSampleMap();
+    for(const auto& ele : tet_edge_mid_sample_map)
+    {
+        const auto& key = ele.first;
+        const auto& val = ele.second;
+        size_t pos = key.find('_');
+        uint64_t a = std::stoull(key.substr(0, pos));
+        uint64_t b = std::stoull(key.substr(pos + 1));
+        size_t new_a_id = vertex_tag_map[a] - 1; 
+        size_t new_b_id = vertex_tag_map[b] - 1; 
+        std::string new_key = new_a_id < new_b_id ? 
+        std::to_string(new_a_id) + "_" + std::to_string(new_b_id) :
+        std::to_string(new_b_id) + "_" + std::to_string(new_a_id);
+        temp_map[new_key] = val;
+    }
+    tet_edge_mid_sample_map.clear();
+    tet_edge_mid_sample_map = temp_map;
+
+    // std::cout << " ----- max_vid " << max_vid << std::endl;
     counter = 0;
     mesh.seq_foreach_tet([&](TetId, std::span<const VertexId, 4> data) {
         tets[counter] = {vertex_tag_map[value_of(data[0])] - 1, vertex_tag_map[value_of(data[1])] - 1, vertex_tag_map[value_of(data[2])] - 1, vertex_tag_map[value_of(data[3])] - 1};
@@ -49,6 +74,7 @@ bool get_mesh_data(const mtet::MTetMesh& mesh,
     });
     return true;
 }
+
 
 bool save_function_json(const std::string& filename,
                         const mtet::MTetMesh mesh,
@@ -232,6 +258,15 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     // mtet::MTetMesh grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
     size_t volume_dim = 4;
     std::array<size_t, 3> new_resolution = {volume_dim, volume_dim, volume_dim};
+
+    //Mesh Bounding Box min -1.291880 -0.607902 0.410953
+    //Mesh Bounding Box max 0.772905 1.236420 1.989450
+    //Mesh Bounding Box min -0.762772 -0.220353 0.525951
+    //Mesh Bounding Box max 0.488482 0.977300 1.989450
+
+    expand_bbox_min = { -0.762772, -0.220353, 0.525951};
+    expand_bbox_max = { 0.488482,  0.977300,  1.989450};
+
     mtet::MTetMesh grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
 
 
@@ -310,6 +345,7 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     std::array<double, timer_amount> profileTimer = {0,0,0,0,0,0,0,0,0,0};
     double max_tet_edge_len = max_len * tet_size_limit;
     // int crest_type = 0;
+    auto time_start = std::chrono::high_resolution_clock::now();
     if(crest_type >= 0)
     {
         if (!gridRefineRidges(mode, crest_type, max_tet_edge_len, args.curve_network, args.threshold, args.alpha, max_elements, funcNum, implicit_func_ridge, csg_func, grid_mesh, metric_list, profileTimer))
@@ -322,7 +358,9 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
             throw std::runtime_error("ERROR: unsuccessful grid refinement");
         }
     }
-    
+    auto time_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> elapsed = time_end - time_start;
+    std::cout << "-------------- adgrid Elapsed time: " << elapsed.count() << " ms\n";
 
     
     // save timing records
@@ -373,10 +411,49 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     
     int counter = 0;
    
-    
+    constexpr std::array<std::array<size_t, 2>, 6> tet_edges3D = {
+        {
+            {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}}
+        }
+    };
     std::shared_ptr<Hermite_RBF<double>> rbf_func = std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[0]);
 if(crest_type != -1)
 { 
+    // std::span<mtet::TetId>(metric_list.activeTetId)
+    std::unordered_set<uint64_t> tet_pt_visited;
+    std::vector<std::array<double,3>> active_tet_pts;
+    std::vector<std::vector<size_t>> active_tet_edges;
+    std::vector<double> active_pts;
+    std::vector<double> active_normals; 
+    for (auto tet_id : metric_list.activeTetId) {
+        auto v_data = grid_mesh.get_tet(tet_id);
+        size_t active_tet_pt_size = active_tet_pts.size();
+        for(const auto& cur_e : tet_edges3D)
+        {
+            active_tet_edges.push_back({cur_e[0] + active_tet_pt_size, cur_e[1] + active_tet_pt_size});
+        }
+        for (int i = 0; i < 4; ++i)
+        {
+            auto vid = value_of(v_data[i]);
+            auto coords = grid_mesh.get_vertex(v_data[i]);
+            active_tet_pts.push_back({coords[0], coords[1], coords[2]});
+            if(tet_pt_visited.find(vid) != tet_pt_visited.end()) continue;
+            tet_pt_visited.insert(vid);
+            auto curv_data = metric_list.vertex_func_grad_map_ridge[vid];
+            
+            active_pts.push_back(coords[0]);
+            active_pts.push_back(coords[1]);
+            active_pts.push_back(coords[2]);
+            active_normals.push_back(curv_data[0].t1_[0]);
+            active_normals.push_back(curv_data[0].t1_[1]);
+            active_normals.push_back(curv_data[0].t1_[2]);
+        }
+    }   
+    std::string pt_k_dir = outdir + "tet_active_pts_k1_dir.xyz";
+    writeXYZnormal(pt_k_dir, active_pts, active_normals);
+    std::string tet_edges_save_path = outdir + "tet_active_edges.obj";
+    VIPSSRidges::SaveRidgesToObj(tet_edges_save_path, 
+        active_tet_pts, active_tet_edges, 1.0, {0, 0, 0});
     vector<CurvatureData<double>> tet_pt_curvature_data;
     get_function_curvature_data(grid_mesh, metric_list.vertex_func_grad_map_ridge, tet_pt_curvature_data);
 

@@ -2109,3 +2109,21 @@ bool ReadTetFromFile(std::vector<std::array<double, 3>>& vertices,
     inFile.close();
     return true;
 }
+
+
+bool SaveStringValsToText(const std::string& path, const std::vector<std::string>& string_vals)
+{
+     std::ofstream outFile(path);
+    if (!outFile.is_open()) {
+        return false;
+    }
+    int count = 0;
+    for(const auto& val : string_vals)
+    {
+        outFile << val << std::endl;
+        count++;
+        if(count > 200)
+        break;
+    }
+    outFile.close();
+}

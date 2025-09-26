@@ -35,9 +35,9 @@ struct PrincipleCurvature{
         double emax_, emin_ = 0;
         double demax_, demin_ = 0;
         double gaussain_e = 0;
+        arma::vec3 pt_;
         arma::vec3 de1_;
         arma::vec3 de2_;
-        arma::vec3 t_max_;
         PrincipleCurvature(){}
         PrincipleCurvature(double k1, double k2, const arma::vec3& t1, const arma::vec3& t2)
         : k1_(k1), k2_(k2), t1_(t1), t2_(t2)  {
@@ -159,6 +159,12 @@ class VIPSSRidges{
                         const PrincipleCurvature& ca, const PrincipleCurvature& cb,
                         int& edge_emax_sign, Point& inter_pa, double& inter_cur_a,
                         int& edge_emin_sign, Point& inter_pb, double& inter_cur_b);
+
+    static bool CalculateCrestPointsSingleQuadratic(const Point& pa, const Point& pb, 
+                        const PrincipleCurvature& ca, const PrincipleCurvature& cb,
+                        const PrincipleCurvature& c_mid,
+                        int& edge_emax_sign, Point& inter_pa, double& inter_cur_a,
+                        int& edge_emin_sign, Point& inter_pb, double& inter_cur_b);
     // static bool CalculateCrestPoints2(const Point& pa, const Point& pb, 
     //                     const PrincipleCurvature& ca, const PrincipleCurvature& cb,
     //                 int& inter_sign, Point& inter_pa);
@@ -247,6 +253,8 @@ class VIPSSRidges{
     static std::string out_dir_;
     std::string file_name_ = "";
     double user_lambda_ = 0.0;
+    static std::vector<std::string> edge_curv_values_string; 
+    static std::vector<std::vector<PrincipleCurvature>> edge_sample_curv_dataset; 
 
 };
 

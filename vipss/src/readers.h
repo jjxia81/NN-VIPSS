@@ -142,4 +142,6 @@ bool SaveTetToFile(const std::vector<std::array<double, 3>>& vertices,
 
 bool ReadTetFromFile(std::vector<std::array<double, 3>>& vertices, 
         std::vector<std::array<size_t, 4>>& tet, const std::string& filename);     
+
+bool SaveStringValsToText(const std::string& path, const std::vector<std::string>& string_vals);
 #endif // READERS_H

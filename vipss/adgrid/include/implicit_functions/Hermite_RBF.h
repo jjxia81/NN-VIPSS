@@ -269,8 +269,8 @@ public:
         cur_data.e1_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t1_);
         cur_data.e2_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t2_);
         // std::cout << " Hrbf : finish ComputeCurvatureDerivative ..." << std::endl;
-        ComputeCurvatureDerivative2({x,y,z}, cur_data.t1_, cur_data.e1_d1_);
-        ComputeCurvatureDerivative2({x,y,z}, cur_data.t2_, cur_data.e2_d2_);
+        // ComputeCurvatureDerivative2({x,y,z}, cur_data.t1_, cur_data.e1_d1_);
+        // ComputeCurvatureDerivative2({x,y,z}, cur_data.t2_, cur_data.e2_d2_);
         cur_data.f_gradient_ = gradient;
         cur_data.f_val_ = f_val_;
         // std::cout << " Hrbf : finish ComputeCurvatureDerivative2 ..." << std::endl;

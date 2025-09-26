@@ -10,11 +10,12 @@
 using Vec7D = Eigen::Vector<double, 7>;
 using IndexMap = ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<Eigen::RowVector4d, 20>>;
 using IndexMapRidge = ankerl::unordered_dense::map<uint64_t, llvm_vecsmall::SmallVector<CurvatureData<double>, 20>>;
-
 using tetActive = ankerl::unordered_dense::map<std::span<VertexId, 4>, bool, TetHash, TetEqual>;
 
+// using EdgePoints
 
-bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid, 
+
+bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid_mesh, 
         const size_t funcNum, 
         const int mode,
         const int crest_type,
@@ -32,13 +33,13 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid,
         const std::function<std::pair<std::array<double, 2>, llvm_vecsmall::SmallVector<int, 20>>(llvm_vecsmall::SmallVector<std::array<double, 2>, 20>)> csg_func
 )
 {
-    std::span<VertexId, 4> vs = grid.get_tet(tid);
+    std::span<VertexId, 4> vs = grid_mesh.get_tet(tid);
     {
         //Timer eval_timer(evaluation, [&](auto profileResult){profileTimer = combine_timer(profileTimer, profileResult);});
         for (int i = 0; i < 4; ++i)
         {
             auto vid = vs[i];
-            auto coords = grid.get_vertex(vid);
+            auto coords = grid_mesh.get_vertex(vid);
             pts.row(i) = Eigen::RowVector3d({coords[0], coords[1], coords[2]});
             llvm_vecsmall::SmallVector<std::array<double, 4>, 20> func_gradList(funcNum);
             
@@ -56,6 +57,26 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid,
         }
         //eval_timer.Stop();
     }
+
+    // mtet::EdgeId longest_edge;
+    // mtet::Scalar longest_edge_length = 0;
+    // grid_mesh.foreach_edge_in_tet(tid, [&](mtet::EdgeId eid, mtet::VertexId v0, mtet::VertexId v1)
+    //                             {
+    //     auto p0 = grid_mesh.get_vertex(v0);
+    //     auto p1 = grid_mesh.get_vertex(v1);
+    //     mtet::Scalar l = (p0[0] - p1[0]) * (p0[0] - p1[0]) + (p0[1] - p1[1]) * (p0[1] - p1[1]) +
+    //     (p0[2] - p1[2]) * (p0[2] - p1[2]);
+    //     if (l > longest_edge_length) {
+    //         longest_edge_length = l;
+    //         longest_edge = eid;
+    //     } });
+    
+    // if(longest_edge_length < tet_max_edge_len)
+    // {
+    //     return false;
+    // }
+    
+
     bool isActive = 0;
     bool orientable = false;
     bool subResult;
@@ -63,7 +84,7 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid,
         // int crest_type = 1;
         // std::cout << " start critIARidge .... " << std::endl;
         // Timer sub_timer(subdivision, [&](auto profileResult){profileTimer = combine_timer(profileTimer, profileResult);});
-        subResult = critIARidge(pts, tet_info, funcNum, threshold, curve_network, crest_type, isActive,orientable, sub_call_two, sub_call_three);
+        subResult = critIARidge(pts, tet_info, tid, grid_mesh, funcNum, threshold, curve_network, crest_type, isActive,orientable, sub_call_two, sub_call_three);
         // std::cout << " finish critIARidge .... " << std::endl;
         // switch (mode){
         //     case IA:
@@ -88,10 +109,10 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid,
     {
         mtet::EdgeId longest_edge;
         mtet::Scalar longest_edge_length = 0;
-        grid.foreach_edge_in_tet(tid, [&](mtet::EdgeId eid, mtet::VertexId v0, mtet::VertexId v1)
+        grid_mesh.foreach_edge_in_tet(tid, [&](mtet::EdgeId eid, mtet::VertexId v0, mtet::VertexId v1)
                                     {
-            auto p0 = grid.get_vertex(v0);
-            auto p1 = grid.get_vertex(v1);
+            auto p0 = grid_mesh.get_vertex(v0);
+            auto p1 = grid_mesh.get_vertex(v1);
             mtet::Scalar l = (p0[0] - p1[0]) * (p0[0] - p1[0]) + (p0[1] - p1[1]) * (p0[1] - p1[1]) +
             (p0[2] - p1[2]) * (p0[2] - p1[2]);
             if (l > longest_edge_length) {
