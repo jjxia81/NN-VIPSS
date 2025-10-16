@@ -16,10 +16,15 @@ OutTetObj OutTetObj::unoriented_tets;
 OutTetObj OutTetObj::unoriented_tets_split;
 OutTetObj OutTetObj::unoriented_tets_unsplit;
 // OutTetObj OutTetObj::unoriented_tets_unsplit;
-OutTetObj OutTetObj::limit_unorientable_tets; 
+// OutTetObj OutTetObj::limit_unorientable_tets; 
 OutTetObj OutTetObj::limit_orientable_tets;
 OutTetObj OutTetObj::rv_failed_tets;
 OutTetObj OutTetObj::threshold_tets;
+OutTetObj OutTetObj::eprime_failed_tets;
+
+OutTetObj OutTetObj::boundary1_unorientable_tets;
+OutTetObj OutTetObj::boundary2_RV_tets;
+OutTetObj OutTetObj::boundary3_eprime_tets;
 
 std::unordered_map<std::string, std::array<std::array<double,4>,2>> tet_edge_mid_ridge_curv_map;
 std::unordered_map<std::string, std::array<double,4>> tet_face_mid_ridge_curv_map;  
@@ -164,7 +169,39 @@ bool TetCrestTypeTest2(const Eigen::RowVector4d& kmax_vals, const Eigen::RowVect
         for(int pid = 0; pid < 4; ++ pid)
         {
             // std::cout << " start kk compare ..." << pid << std::endl;
-            if(abs(kmax_vals[pid]) < abs(kmin_vals[pid]) && kmax_vals[pid] < 0 )
+            if(abs(kmax_vals[pid]) < abs(kmin_vals[pid]) && kmin_vals[pid] < 0 )
+            {
+                count ++;
+            }
+        }
+    }
+    if(count > 0)
+    {
+        return true;
+    }
+    return false;
+}
+
+
+
+bool TetEPrimeSignTest(const Eigen::RowVector4d& e_prime_vals, const int crest_type, int& count)
+{
+    count = 0;
+    if(crest_type == 0)
+    {
+        for(int pid = 0; pid < 4; ++ pid)
+        {
+            if(e_prime_vals[pid] < 0)
+            {
+                count ++;
+            }
+        }
+    } else {
+
+        for(int pid = 0; pid < 4; ++ pid)
+        {
+            // std::cout << " start kk compare ..." << pid << std::endl;
+            if(e_prime_vals[pid] > 0)
             {
                 count ++;
             }
@@ -569,23 +606,27 @@ double  bezierSampleValsWithHashSimple(
             
             if(crest_type == 0)
             {
-                if(cur_data.t1_.dot(k_dir_main) < 0)
-                {
-                    cur_data.t1_ *= -1;
-                    cur_data.e1_ *= -1;
-                }
+                sample_vals[eid] = cur_data.t1_.dot(k_dir_main) < 0 ? - cur_data.e1_ : cur_data.e1_;
+                // if(cur_data.t1_.dot(k_dir_main) < 0)
+                // {
+                //     // cur_data.t1_ *= -1;
+                //     // cur_data.e1_ *= -1;
+                // }
             } else {
-                if(cur_data.t2_.dot(k_dir_main) < 0)
-                {
-                    cur_data.t2_ *= -1;
-                    cur_data.e2_ *= -1;
-                }
+                // if(cur_data.t2_.dot(k_dir_main) < 0)
+                // {
+                //     // cur_data.t2_ *= -1;
+                //     // cur_data.e2_ *= -1;
+                // }
+                sample_vals[eid] = cur_data.t2_.dot(k_dir_main) < 0 ? - cur_data.e2_ : cur_data.e2_;
             } 
+            
+
             edge_mid_e_t_vals[eid] = {cur_data.e1_, cur_data.t1_[0], 
                                             cur_data.t1_[1], cur_data.t1_[2],
                                             cur_data.e2_, cur_data.t2_[0], 
                                             cur_data.t2_[1], cur_data.t2_[2]};
-            sample_vals[eid] = crest_type == 0 ?  edge_mid_e_t_vals[eid][0] : edge_mid_e_t_vals[eid][4];
+            // sample_vals[eid] = crest_type == 0 ?  edge_mid_e_t_vals[eid][0] : edge_mid_e_t_vals[eid][4];
         }  else {
             edge_mid_e_t_vals[eid] = tet_edge_mid_curv_map[e_key];
             Eigen::Vector3d cur_kmax_dir = {edge_mid_e_t_vals[eid][1], edge_mid_e_t_vals[eid][2], edge_mid_e_t_vals[eid][3]};
@@ -873,7 +914,8 @@ bool critIARidge(
             bool& active,
             bool& orientable,
             int &sub_call_two,
-            int &sub_call_three )
+            int &sub_call_three,
+            int& boundary_type )
 {
     Eigen::Matrix<double, Eigen::Dynamic, 20> valList (funcNum, 20);
     Eigen::Matrix<double, Eigen::Dynamic, 16> diffList(funcNum, 16);
@@ -898,6 +940,8 @@ bool critIARidge(
         // std::cout << " finish assign func_info ..." << std::endl;
         // Eigen::RowVector4d vals = func_info.col(0);
         Eigen::RowVector4d f_vals;
+        Eigen::RowVector4d emax_prime_vals;
+        Eigen::RowVector4d emin_prime_vals;
         Eigen::Matrix<double, 4, 3> f_grads;
         Eigen::RowVector4d emax_vals;
         Eigen::RowVector4d emin_vals;
@@ -915,20 +959,27 @@ bool critIARidge(
             emin_vals[i] = tet_info[i][funcIter].e2_;
             kmax_vals[i] = tet_info[i][funcIter].k1_;
             kmin_vals[i] = tet_info[i][funcIter].k2_;
+            emax_prime_vals[i] = tet_info[i][funcIter].e1_prime_;
+            emin_prime_vals[i] = tet_info[i][funcIter].e2_prime_;
             k1_dirs.row(i) =  tet_info[i][funcIter].t1_;
             k2_dirs.row(i) =  tet_info[i][funcIter].t2_;
             grads_eigen_de1.row(i) =  tet_info[i][funcIter].e1_d1_;
             grads_eigen_de2.row(i) =  tet_info[i][funcIter].e2_d2_;
             f_grads.row(i) =  tet_info[i][funcIter].f_gradient_;
         }
-        // auto bezier_f_vals = bezierConstruct(f_vals, f_grads, vec);
-        // bool zero_cross_iso = get_sign(bezier_f_vals.maxCoeff()) != get_sign(bezier_f_vals.minCoeff());
-        // // std::cout << " zero cross iso res : " << zero_cross_iso << "  " << bezier_f_vals.maxCoeff() << " " 
-        // //             << bezier_f_vals.minCoeff() << std::endl;
-        // if(!zero_cross_iso)
-        // {
-        //     return false;
-        // }
+        auto bezier_f_vals = bezierConstruct(f_vals, f_grads, vec);
+        bool zero_cross_iso = get_sign(bezier_f_vals.maxCoeff()) != get_sign(bezier_f_vals.minCoeff());
+        
+        double iso_offset_val = 0.05;
+        if(!zero_cross_iso)
+        {
+            auto bezier_f_vals_abs = bezier_f_vals.cwiseAbs();
+            if(bezier_f_vals_abs.minCoeff() > iso_offset_val)
+            {
+                return false;
+            }
+        }
+        
         // std::cout << " finish assign curvature data info ..." << std::endl;
         // 0 stands for rigdes, 1 for valleys
         // bool is_target_crest_type = TetCrestTypeTest(kmax_vals, kmin_vals, crest_type);
@@ -942,18 +993,23 @@ bool critIARidge(
             OutTetObj::rv_failed_tets.AddNewTet(pts);
             return false;
         } 
-        if(rv_tet_pt_count < 4)
+        
+        const auto& e_prime_vals = crest_type == 0? emax_prime_vals : emin_prime_vals;
+        int e_prime_count = 0;
+        bool e_prime_sign_consistent = TetEPrimeSignTest(e_prime_vals, crest_type, e_prime_count);
+        if(!e_prime_sign_consistent )
         {
-            active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
-            return active;
+            OutTetObj::eprime_failed_tets.AddNewTet(pts);
+            return false;
         }
+        
         orientable = CheckTetOrientable(e_vals, k_dirs);
-
         if(orientable) 
         {
             active = e_vals.maxCoeff() * e_vals.minCoeff() < 0;
         } else {
-            OutTetObj::unoriented_tets.AddNewTet(pts);
+            // OutTetObj::unoriented_tets.AddNewTet(pts);
+            boundary_type = 1;
             // active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
             active = true;
             return true;
@@ -962,26 +1018,21 @@ bool critIARidge(
         {
             return false;
         }
-        // valList.row(funcIter) = bezierSampleVals(pts, e_vals, k_dirs, crest_type);
-        // std::cout << " val list 0 : " << valList.row(funcIter) << std::endl;
-        // double dot_threshold = 0.996;
-        // if(active )
-        // {
-        // return !TetDirConsistenceThreshold(k_dirs, dot_threshold);
-        // } 
-     
-        // return true;
-        // Eigen::Matrix<double, 4, 3> grads_eigen = func_info.rightCols(3);
-        // Eigen::Matrix<double, 4, 3> k1_dirs = func_info.middleCols(1, 3);
-        // std::cout << " start bezierConstructRidge ..." << std::endl; 
-        // valList.row(funcIter) = bezierConstructRidge(vals, k1_dirs, grads_eigen, vec);
-        // std::cout << " finsih bezierConstructRidge ..." << std::endl; 
-        //Timer single_timer(singleFunc, [&](auto profileResult){profileTimer = combine_timer(profileTimer, profileResult);});
-        // activeTF[funcIter] = get_sign(valList.row(funcIter).maxCoeff()) != get_sign(valList.row(funcIter).minCoeff());
-        // if(get_sign(vals.maxCoeff()) != get_sign(vals.minCoeff()))
-        // {
-        //     activeTF[funcIter] = true;
-        // }
+        if(rv_tet_pt_count < 4)
+        {
+            // active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
+            active = true;
+            boundary_type = 2;
+            return active;
+        }
+        if(e_prime_count < 4)
+        {
+            boundary_type = 3;
+            active = true;
+            // active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
+            return true;
+        }
+
         //single_timer.Stop();
         // if (activeTF[funcIter])
         {

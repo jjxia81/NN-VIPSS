@@ -460,8 +460,8 @@ bool VIPSSRidges::CalMeshPointsCurvature(std::shared_ptr<RBF_Core> hrfb_ptr,
         arma::cube third_derivs;
         ComputeThirdDerivatives(pt, hrfb_ptr, third_derivs, 1e-8);
 
-        std::vector<arma::cube> fourth_derivs;
-        ComputeFourthDerivatives(pt, hrfb_ptr, fourth_derivs, 1e-8);
+        // std::vector<arma::cube> fourth_derivs;
+        // ComputeFourthDerivatives(pt, hrfb_ptr, fourth_derivs, 1e-8);
 
 
         // std::cout << "pt " << pt[0] << " " << pt[1] << " " << pt[2] 
@@ -471,13 +471,13 @@ bool VIPSSRidges::CalMeshPointsCurvature(std::shared_ptr<RBF_Core> hrfb_ptr,
             pt, gradient, hessian, third_derivs, hrfb_ptr, pt_curvatures[i].tmax_);
         pt_curvatures[i].emin_ = ComputeCurvatureDerivative(
             pt, gradient, hessian, third_derivs, hrfb_ptr, pt_curvatures[i].tmin_);
-        if(0)
-        {
-            pt_curvatures[i].demax_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
-                fourth_derivs, hrfb_ptr, pt_curvatures[i].tmax_, pt_curvatures[i].kmax_, pt_curvatures[i].emax_);
-            pt_curvatures[i].demin_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
-                fourth_derivs, hrfb_ptr, pt_curvatures[i].tmin_, pt_curvatures[i].kmin_, pt_curvatures[i].emin_);
-        }
+        // if(0)
+        // {
+        //     pt_curvatures[i].demax_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
+        //         fourth_derivs, hrfb_ptr, pt_curvatures[i].tmax_, pt_curvatures[i].kmax_, pt_curvatures[i].emax_);
+        //     pt_curvatures[i].demin_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
+        //         fourth_derivs, hrfb_ptr, pt_curvatures[i].tmin_, pt_curvatures[i].kmin_, pt_curvatures[i].emin_);
+        // }
         
         // pt_curvatures[i].UpdateMax();
     }
@@ -944,86 +944,18 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
     if(ka_max > abs(ka_min) || kb_max > abs(kb_min) )
     {
-        if(ea_max * eb_max < 0)
+        if(ea_max * eb_max < 0 && (ca.emax_prime_ <= 0 || cb.emax_prime_ <= 0))
+        // if(ea_max * eb_max < 0 )
         {
             edge_emax_sign = 1;
             // if(ea_max * (arma::dot(pba, ta_max)) > 0)
             {
                 double abs_sum = abs(ea_max)  + abs(eb_max);
-                if(edge_curv_values_string.size() < 100 && ka_max > 5)
-                {
-                    arma::vec3 edge_dir = pab /sqrt(arma::dot(pab, pab));
-                    if(abs(arma::dot(ta_max, edge_dir)) > 0.5)
-                    {
-                        std::vector<double> t_list = {0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
-                        std::vector<PrincipleCurvature> cur_edge_sample_curvs;
-                        for(int t_id = 0; t_id < t_list.size(); ++ t_id)
-                        {
-                            double new_px = pa[0] + (pb[0] - pa[0]) * t_list[t_id];
-                            double new_py = pa[1] + (pb[1] - pa[1]) * t_list[t_id];
-                            double new_pz = pa[2] + (pb[2] - pa[2]) * t_list[t_id];
-                            std::array<double,3> new_pt = {new_px, new_py, new_pz};
-                            PrincipleCurvature new_curv_data;
-                            CalSinglePointCurvatureData(new_pt,new_curv_data );
-                            
-                            new_curv_data.pt_ = {new_px, new_py, new_pz};
-                            if(arma::dot(ta_max, new_curv_data.tmax_) < 0)
-                            {
-                                new_curv_data.tmax_ *= -1;
-                                new_curv_data.emax_ *= -1;
-                            }
-                            cur_edge_sample_curvs.push_back(new_curv_data);
-                        }
-                        edge_sample_curv_dataset.push_back(cur_edge_sample_curvs);
-                        
-                        std::string val_string = std::to_string(pa[0]) + "," + std::to_string(pa[1]) + "," + std::to_string(pa[2]) 
-                        + "," + std::to_string(pb[0]) + "," + std::to_string(pb[1]) + "," + std::to_string(pb[2]) 
-                        + "," + std::to_string(ta_max[0]) + "," + std::to_string(ta_max[1]) + "," + std::to_string(ta_max[2])
-                        + "," + std::to_string(tb_max[0]) + "," + std::to_string(tb_max[1]) + "," + std::to_string(tb_max[2])
-                        + "," + std::to_string(ka_max) + "," + std::to_string(kb_max) 
-                        + "," + std::to_string(ea_max) + "," + std::to_string(eb_max);
-                        edge_curv_values_string.push_back(val_string);
-                    }
-                }
+                
                 // InterpolateCrestPointQuadratic(pa, pb, ta_max, tb_max, ka_max, kb_max, ea_max, eb_max, inter_pa);
                 InterpolateCrestPoint(pa, pb, ea_max, eb_max, inter_pa);
                 inter_cur_a = (abs(eb_max) * ka_max+ abs(ea_max) * kb_max)/abs_sum;
-                Point new_pa = pa;
-                Point new_pb = pb;
-                // std::cout << " inter p coord : " << inter_pa[0] << " " << inter_pa[1] << " " << inter_pa[2] << std::endl;
-                // int loop_num = 0;
-                // for(int loop_id = 0; loop_id < loop_num; ++loop_id)
-                // {
-                //     PrincipleCurvature intera_curva;
-                //     CalSinglePointCurvatureData(inter_pa, intera_curva);
-                //     auto t_interp_max = intera_curva.tmax_;
-                //     auto e_interp_max = intera_curva.emax_;
-                //     if(arma::dot(ta_max, t_interp_max) < 0)
-                //     {
-                //         t_interp_max *= -1.0;
-                //         e_interp_max *= -1.0;
-                //     } 
-                //     Point new_interp_p;
-                //     if(ea_max * e_interp_max <= 0)
-                //     {
-                //         InterpolateCrestPoint(new_pa, inter_pa, ea_max, e_interp_max, new_interp_p);
-                //         eb_max = e_interp_max;
-                //         new_pb = new_interp_p; 
-                //     } else {
-                //         InterpolateCrestPoint(new_pb, inter_pa, eb_max, e_interp_max, new_interp_p);
-                //         ea_max = e_interp_max;
-                //         new_pa = new_interp_p;
-                //     }
-                //     inter_pa = new_interp_p;
-                //     // std::cout << " inter p coord " << loop_id << " : " << inter_pa[0] << " " << inter_pa[1] << " " << inter_pa[2] << std::endl;
-                // }
-                
-                // inter_pa = {px, py, pz};
-                // edge_emax_sign = 1;
-                // edge_ridge_pts_.push_back({px, py, pz});
-                // edge_ridge_pts_curvature_.push_back(int_curvature);
-                // riges_sign = interp_ridge_p_id_;
-                // interp_ridge_p_id_ ++;
+               
             }
         } 
     }
@@ -1037,48 +969,17 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
     if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
     {
-        if(ea_min * eb_min < 0)
+        if(ea_min * eb_min < 0  && (ca.emax_prime_ > 0 || cb.emax_prime_ > 0))
+        // if(ea_min * eb_min < 0)
         {
             edge_emin_sign = 1;
             // if(ea_min * (arma::dot(pba, ta_min)) > 0)
             {
-
                 double abs_sum = abs(ea_min)  + abs(eb_min);
                 inter_cur_b = (abs(eb_min) * ka_min+ abs(ea_min) * kb_min) 
                                 /(abs(ea_min)  + abs(eb_min));
                 // InterpolateCrestPointQuadratic(pa, pb, ta_min, tb_min, ka_min, kb_min, ea_min, eb_min, inter_pb);
                 InterpolateCrestPoint(pa, pb, ea_min, eb_min, inter_pb);
-                Point new_pa = pa;
-                Point new_pb = pb;
-                // int loop_num = 0;
-                // for(int loop_id = 0; loop_id < loop_num; ++loop_id)
-                // {
-                //     PrincipleCurvature intera_curva;
-                //     CalSinglePointCurvatureData(inter_pa, intera_curva);
-                //     auto t_interp_min = intera_curva.tmin_;
-                //     auto e_interp_min = intera_curva.emin_;
-                //     if(arma::dot(ta_min, t_interp_min) < 0)
-                //     {
-                //         t_interp_min *= -1.0;
-                //         e_interp_min *= -1.0;
-                //     } 
-                //     Point new_interp_p;
-                //     if(ea_min * e_interp_min <= 0)
-                //     {
-                //         InterpolateCrestPoint(new_pa, inter_pa, ea_min, e_interp_min, new_interp_p);
-                //         eb_min = e_interp_min;
-                //         new_pb = new_interp_p;
-                //     } else {
-                //         InterpolateCrestPoint(new_pb, inter_pa, eb_min, e_interp_min, new_interp_p);
-                //         ea_min = e_interp_min;
-                //         new_pa = new_interp_p;
-                //     }
-                //     inter_pa = new_interp_p;
-                // }
-                // edge_valley_pts_.push_back({px, py, pz});
-                // edge_valley_pts_curvature_.push_back(int_curvature);
-                // valley_sign = interp_valley_p_id_;
-                // interp_valley_p_id_ ++;
             }
         } 
     }
@@ -1124,6 +1025,8 @@ bool VIPSSRidges::CalculateCrestPointsSingleQuadratic(const Point& pa, const Poi
     auto ta_max = ca.tmax_;  auto ta_min = ca.tmin_;
     auto tb_max = cb.tmax_;  auto tb_min = cb.tmin_;
 
+    double emax_prime_a = ca.emax_prime_;
+
     arma::vec pab = {pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]};
 
     // cal max for ridges 
@@ -1135,49 +1038,13 @@ bool VIPSSRidges::CalculateCrestPointsSingleQuadratic(const Point& pa, const Poi
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
     if(ka_max > abs(ka_min) || kb_max > abs(kb_min) )
     {
-        if(ea_max * eb_max < 0)
+        if(ea_max * eb_max < 0 && (ca.emax_prime_ < 0 && cb.emax_prime_ < 0))
+        // if(ea_max * eb_max < 0 )
         {
             edge_emax_sign = 1;
             // if(ea_max * (arma::dot(pba, ta_max)) > 0)
             {
                 double abs_sum = abs(ea_max)  + abs(eb_max);
-                if(edge_curv_values_string.size() < 100 && ka_max > 5)
-                {
-                    arma::vec3 edge_dir = pab /sqrt(arma::dot(pab, pab));
-                    if(abs(arma::dot(ta_max, edge_dir)) > 0.5)
-                    {
-                        std::vector<double> t_list = {0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
-                        std::vector<PrincipleCurvature> cur_edge_sample_curvs;
-                        for(int t_id = 0; t_id < t_list.size(); ++ t_id)
-                        {
-                            double new_px = pa[0] + (pb[0] - pa[0]) * t_list[t_id];
-                            double new_py = pa[1] + (pb[1] - pa[1]) * t_list[t_id];
-                            double new_pz = pa[2] + (pb[2] - pa[2]) * t_list[t_id];
-                            std::array<double,3> new_pt = {new_px, new_py, new_pz};
-                            PrincipleCurvature new_curv_data;
-                            CalSinglePointCurvatureData(new_pt,new_curv_data );
-                            
-                            new_curv_data.pt_ = {new_px, new_py, new_pz};
-                            if(arma::dot(ta_max, new_curv_data.tmax_) < 0)
-                            {
-                                new_curv_data.tmax_ *= -1;
-                                new_curv_data.emax_ *= -1;
-                            }
-                            cur_edge_sample_curvs.push_back(new_curv_data);
-                        }
-                        edge_sample_curv_dataset.push_back(cur_edge_sample_curvs);
-                        
-                        std::string val_string = std::to_string(pa[0]) + "," + std::to_string(pa[1]) + "," + std::to_string(pa[2]) 
-                        + "," + std::to_string(pb[0]) + "," + std::to_string(pb[1]) + "," + std::to_string(pb[2]) 
-                        + "," + std::to_string(ta_max[0]) + "," + std::to_string(ta_max[1]) + "," + std::to_string(ta_max[2])
-                        + "," + std::to_string(tb_max[0]) + "," + std::to_string(tb_max[1]) + "," + std::to_string(tb_max[2])
-                        + "," + std::to_string(ka_max) + "," + std::to_string(kb_max) 
-                        + "," + std::to_string(ea_max) + "," + std::to_string(eb_max);
-                        edge_curv_values_string.push_back(val_string);
-                    }
-                }
-                // InterpolateCrestPointQuadratic(pa, pb, ta_max, tb_max, ka_max, kb_max, ea_max, eb_max, inter_pa);
-                // InterpolateCrestPoint(pa, pb, ea_max, eb_max, inter_pa);
                 double e_mid = arma::dot(ta_max, c_mid.tmax_) < 0 ? - c_mid.emax_ : c_mid.emax_;
                 double t = InterpolateQuadratic(ea_max, e_mid, eb_max);
                 double interp_px = pa[0] + (pb[0] - pa[0]) * t;
@@ -1196,26 +1063,26 @@ bool VIPSSRidges::CalculateCrestPointsSingleQuadratic(const Point& pa, const Poi
         eb_min *= -1.0;
     } 
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
-    if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
+    // if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
+    if(ka_min + ka_max < 0 || kb_min + kb_max < 0 )
     {
-        if(ea_min * eb_min < 0)
+        if(ea_min * eb_min < 0 && (ca.emin_prime_ > 0 || cb.emin_prime_ > 0))
+        // if(ea_min * eb_min < 0)
         {
             edge_emin_sign = 1;
             // if(ea_min * (arma::dot(pba, ta_min)) > 0)
             {
-
                 double abs_sum = abs(ea_min)  + abs(eb_min);
                 inter_cur_b = (abs(eb_min) * ka_min+ abs(ea_min) * kb_min) 
                                 /(abs(ea_min)  + abs(eb_min));
                 // InterpolateCrestPointQuadratic(pa, pb, ta_min, tb_min, ka_min, kb_min, ea_min, eb_min, inter_pb);
                 // InterpolateCrestPoint(pa, pb, ea_min, eb_min, inter_pb);
-                double e_mid_min = arma::dot(ta_min, c_mid.tmin_) < 0 ? c_mid.emin_ : - c_mid.emin_;
+                double e_mid_min = arma::dot(ta_min, c_mid.tmin_) < 0 ? - c_mid.emin_ : c_mid.emin_;
                 double t = InterpolateQuadratic(ea_min, e_mid_min, eb_min);
                 double interp_px = pa[0] + (pb[0] - pa[0]) * t;
                 double interp_py = pa[1] + (pb[1] - pa[1]) * t;
                 double interp_pz = pa[2] + (pb[2] - pa[2]) * t;
                 inter_pb = {interp_px, interp_py, interp_pz};
-              
             }
         } 
     }
@@ -1535,7 +1402,9 @@ bool VIPSSRidges::CalculateRidegeEdges(const TriFace& cur_f,
 void VIPSSRidges::ExtractLevelSetCurvesOnMesh(const std::vector<Point>& mesh_points, 
                 const std::vector<std::vector<size_t>>& mesh_faces, 
                 const std::vector<double> &pt_vals,
-                const string& curve_path, double level_val)
+                const string& curve_path,
+                const double level_val, 
+                const std::array<double,3> color)
 {
     std::vector<std::vector<size_t>> mesh_edges; 
     std::unordered_map<std::string, size_t> edge_token_id_map;
@@ -1575,8 +1444,8 @@ void VIPSSRidges::ExtractLevelSetCurvesOnMesh(const std::vector<Point>& mesh_poi
         const auto& pa = mesh_points[pa_id];
         const auto& pb = mesh_points[pb_id];
 
-        const auto val_a = pt_vals[pa_id];
-        const auto val_b = pt_vals[pb_id];
+        const auto val_a = pt_vals[pa_id] - level_val;
+        const auto val_b = pt_vals[pb_id] - level_val;
 
         
         if( val_a * val_b <= 0)
@@ -1633,7 +1502,18 @@ void VIPSSRidges::ExtractLevelSetCurvesOnMesh(const std::vector<Point>& mesh_poi
             }
         }
     }
-    SaveRidgesToObj(curve_path, inter_pts, curve_edges, scale_, ori_center_);
+    // SaveRidgesToObj(curve_path, inter_pts, curve_edges, scale_, ori_center_);
+    // std::array<double,3> color = {0, 0.5, 0};
+    // if(level_val > 0)
+    // {
+    //     color[0] = std::min(1.0, level_val/0.2);
+    // } else {
+    //     color[2] = std::min(1.0, -level_val/0.2);
+    // }
+
+    SaveRidgesToObjWithColor(curve_path, inter_pts, curve_edges, color, scale_, ori_center_);
+
+    VIPSSRidges::SaveRidgesWithColorToPLY(curve_path + "_color.ply", inter_pts, curve_edges, color);
 }
 
 
@@ -2058,6 +1938,33 @@ void VIPSSRidges::SaveRidgesToObj(const std::string& out_path,
     std::cout << "OBJ file saved successfully: " << out_path << std::endl;
 }
 
+void VIPSSRidges::SaveRidgesToObjWithColor(const std::string& out_path, 
+       const std::vector<Point>& edge_int_pts, 
+       const std::vector<std::vector<size_t>>& ridge_edges,
+       const std::array<double,3>& color,
+        double scale = 1.0, Point ori_center = {0, 0, 0})
+{
+    std::ofstream objFile(out_path);
+    if (!objFile) {
+        std::cerr << "Error: Could not open file for writing." << std::endl;
+        return;
+    }
+    // Write vertices
+    for (const auto& point : edge_int_pts) {
+        double px = point[0] * scale + ori_center[0];
+        double py = point[1] * scale + ori_center[1];
+        double pz = point[2] * scale + ori_center[2];
+        objFile << "v " << px << " " << py << " " << pz << " " 
+                <<  color[0] << " " << color[1] << " " << color[2] <<  "\n";
+    }
+    // Write edges as line elements (OBJ uses 'l' for lines)
+    for (const auto& edge : ridge_edges) {
+        objFile << "l " << edge[0] + 1 << " " << edge[1] + 1 << "\n";  // OBJ uses 1-based indexing
+    }
+    objFile.close();
+    std::cout << "OBJ file saved successfully: " << out_path << std::endl;
+}
+
 
 
 void VIPSSRidges::SaveRidgesWithColorToPLY(const std::string& filename) {
@@ -2124,6 +2031,66 @@ void VIPSSRidges::SaveRidgesWithColorToPLY(const std::string& filename) {
     file.close();
     std::cout << "PLY file saved: " << filename << std::endl;
 }
+
+void VIPSSRidges::SaveRidgesWithColorToPLY(const std::string& filename,
+    const std::vector<Point>& pts, 
+    const std::vector<std::vector<size_t>>& edges, 
+    const std::array<double, 3>& edge_color) {
+    const std::array<int, 3> color = {int(edge_color[0] * 255),int(edge_color[1] * 255), int(edge_color[2] * 255) };
+    //  const std::vector<Point>& points, const std::vector<Edge>& edges
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error: Unable to open file " << filename << std::endl;
+        return;
+    }
+    // Write PLY header
+    file << "ply\n";
+    file << "format ascii 1.0\n";
+    file << "element vertex " << pts.size() + edges.size()<< "\n";
+    file << "property float x\n";
+    file << "property float y\n";
+    file << "property float z\n";
+    file << "property uchar red\n";
+    file << "property uchar green\n";
+    file << "property uchar blue\n";
+    file << "element face " << edges.size() << "\n";
+    file << "property list uchar int vertex_indices\n";
+    file << "end_header\n";
+
+    // std::cout << "edge_point_types_ size " << edge_point_types_.size() << std::endl;
+    // Write vertex data
+    for (int i =0; i < pts.size(); ++i) {
+        const auto& point = pts[i];
+        double px = point[0] * scale_ + ori_center_[0];
+        double py = point[1] * scale_ + ori_center_[1];
+        double pz = point[2] * scale_ + ori_center_[2];
+        file << px << " " << py << " " << pz << " " ;
+        file << color[0] << " " << color[1] << " " << color[2] << " "  << "\n";
+    }
+    // Write edge data
+    size_t pid = pts.size();
+    std::vector<std::array<size_t,3>> faces;
+    for (const auto& e : edges) {
+        
+        faces.push_back({e[0], e[1], pid});
+        pid ++;
+        const auto& p0 = pts[e[0]];
+        const auto& p1 = pts[e[1]];
+        double px = (p0[0] + p1[0])/ 2.0; 
+        double py = (p0[1] + p1[1])/ 2.0; 
+        double pz = (p0[2] + p1[2])/ 2.0; 
+        file << px << " " << py << " " << pz << " " ;
+        file << color[0] << " " << color[1] << " " << color[2] << " " << "\n";
+       
+    }
+    for(const auto& face : faces)
+    {
+        file << "3 " << face[0] << " " << face[1] << " " << face[2] << std::endl;
+    }
+    file.close();
+    std::cout << "PLY file saved: " << filename << std::endl;
+}
+
 
 
 

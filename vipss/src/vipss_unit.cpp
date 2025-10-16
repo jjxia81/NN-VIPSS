@@ -1343,6 +1343,7 @@ void VIPSSUnit::RunRidgesGHRBF2()
         // user_lambda_ = 0.0001;
         BuildGlobalHRBFVipss(pts, rfb_ptr, user_lambda_);
     }
+    rfb_ptr->Write_Hermite_NormalPrediction(out_dir_ + "estimated_normal", 1);
     // adgrid_threshold_ = 0.005;
     std::vector<std::array<double, 3> > output_vertices;
     std::vector<std::array<size_t, 3> > output_triangles;
@@ -1394,13 +1395,31 @@ void VIPSSUnit::RunRidgesGHRBF2()
         double dist = rfb_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
         valle_mesh_pts_dist_vals.push_back(dist);
     }
-    std::string ridge_mesh_curve_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_curve.obj";
-    VIPSSRidges::ExtractLevelSetCurvesOnMesh(ridge_mesh_pts, ridge_mesh_faces, 
-                            ridge_mesh_pts_dist_vals, ridge_mesh_curve_path);
+    // std::string ridge_mesh_curve_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_curve_0.obj";
+    // VIPSSRidges::ExtractLevelSetCurvesOnMesh(ridge_mesh_pts, ridge_mesh_faces, 
+    //                         ridge_mesh_pts_dist_vals, ridge_mesh_curve_path, 0);
+    
+    // double offset_step = 0.05;
+    double offset_step = 0.01; int offset_num = 4;
+    for(int i = -offset_num; i <= offset_num; ++i)
+    {
+        double cur_offset_val = offset_step * i;
+        double u = (i + offset_num) / double(2 * offset_num);
+        RGBColor cur_color = ErrorColorBlend(u);
+        std::array color = {cur_color.r, cur_color.g, cur_color.b};
+        std::string ridge_mesh_curve_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_curve_" 
+                                + std::to_string(cur_offset_val) + ".obj";
+        VIPSSRidges::ExtractLevelSetCurvesOnMesh(ridge_mesh_pts, ridge_mesh_faces, 
+                            ridge_mesh_pts_dist_vals, ridge_mesh_curve_path, cur_offset_val, color);
+
+        
+    }
+    
+    
 
     std::string valle_mesh_curve_path = out_dir_ + "/" + file_name_ +"_valleMesh_curve.obj";
     VIPSSRidges::ExtractLevelSetCurvesOnMesh(valley_mesh_pts, valley_mesh_faces, 
-                            valle_mesh_pts_dist_vals, valle_mesh_curve_path);
+                            valle_mesh_pts_dist_vals, valle_mesh_curve_path, 0, {0,0,0});
 
     // vipss_ridges_.ProjectMeshPtsToSurface(output_vertices, rfb_ptr);
     // tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh_projected" + std::to_string(user_lambda_)+".ply";

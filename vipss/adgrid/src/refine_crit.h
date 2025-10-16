@@ -34,10 +34,13 @@ class OutTetObj{
     static OutTetObj unoriented_tets;
     static OutTetObj unoriented_tets_split;
     static OutTetObj unoriented_tets_unsplit;
-    static OutTetObj limit_unorientable_tets;
+    static OutTetObj boundary1_unorientable_tets;
+    static OutTetObj boundary2_RV_tets;
+    static OutTetObj boundary3_eprime_tets;
     static OutTetObj limit_orientable_tets;
     static OutTetObj rv_failed_tets;
     static OutTetObj threshold_tets;
+    static OutTetObj eprime_failed_tets;
     
 };
 
@@ -76,6 +79,8 @@ bool critIA(const Eigen::Matrix<double, 4, 3> &pts,
             int &sub_call_two,
             int &sub_call_three);
 
+//boundary_type 0, means no boundary, 1 means unorientable tet, 2 ridge valley switch tet, 3 e prime 0 crossing
+
 bool critIARidge(
             const Eigen::Matrix<double, 4, 3> &pts,
             const std::array<llvm_vecsmall::SmallVector<CurvatureData<double>, 20>,4>& tet_info,
@@ -88,7 +93,8 @@ bool critIARidge(
             bool& active,
             bool& orientable,
             int &sub_call_two,
-            int &sub_call_three);
+            int &sub_call_three,
+            int& boundary_type);
 
 ///This function performs two checks (zero-crossing and distance checks) under the setting of constructive solid geometry(CSG) and its curve network.
 ///The parameters follow the same style of `critIA`. Below is the only different input.

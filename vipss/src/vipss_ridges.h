@@ -38,6 +38,8 @@ struct PrincipleCurvature{
         arma::vec3 pt_;
         arma::vec3 de1_;
         arma::vec3 de2_;
+        double emax_prime_ = 0;
+        double emin_prime_ = 0;
         PrincipleCurvature(){}
         PrincipleCurvature(double k1, double k2, const arma::vec3& t1, const arma::vec3& t2)
         : k1_(k1), k2_(k2), t1_(t1), t2_(t2)  {
@@ -94,10 +96,19 @@ class VIPSSRidges{
     static void SaveRidgesToObj(const std::string& out_path, 
        const std::vector<Point>& edge_int_pts, 
        const std::vector<std::vector<size_t>>& ridge_edges, double scale, Point ori_center);
+    static void SaveRidgesToObjWithColor(const std::string& out_path, 
+       const std::vector<Point>& edge_int_pts, 
+       const std::vector<std::vector<size_t>>& ridge_edges,
+       const std::array<double,3>& color,
+        double scale, Point ori_center);
     void SaveRidgesWithColorToObj(const std::string& objFile, const std::string& mtlFile);
     void CalEdgePointQuality(LocalVipss* local_vipss);
     void SaveRidgesWithQualityToPLY(const std::string& filename, const std::vector<double>& qualtity); 
     void SaveRidgesWithColorToPLY(const std::string& filename);
+    static void SaveRidgesWithColorToPLY(const std::string& filename,
+    const std::vector<Point>& pts, 
+    const std::vector<std::vector<size_t>>& edges, 
+    const std::array<double, 3>& edge_color);
     void SetDataCenterAndScale(const Point& center, const double scale); 
     // Point IterpolateEdgesPt(const Point& pa, const Point& pb, double va, double vb, double inter_val = 0);
     void BuildPtAdjInfo();
@@ -187,7 +198,8 @@ class VIPSSRidges{
     static void ExtractLevelSetCurvesOnMesh(const std::vector<Point>& mesh_points, 
                 const std::vector<std::vector<size_t>>& mesh_faces, 
                 const std::vector<double> &pt_vals,
-                const string& curve_path, double level_val = 0);
+                const string& curve_path, const double level_val, 
+                const std::array<double,3> color);
 
 
     public:

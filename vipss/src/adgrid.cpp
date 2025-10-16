@@ -264,8 +264,8 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     //Mesh Bounding Box min -0.762772 -0.220353 0.525951
     //Mesh Bounding Box max 0.488482 0.977300 1.989450
 
-    expand_bbox_min = { -0.762772, -0.220353, 0.525951};
-    expand_bbox_max = { 0.488482,  0.977300,  1.989450};
+    // expand_bbox_min = { -0.762772, -0.220353, 0.525951};
+    // expand_bbox_max = { 0.488482,  0.977300,  1.989450};
 
     mtet::MTetMesh grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
 
@@ -417,6 +417,9 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
         }
     };
     std::shared_ptr<Hermite_RBF<double>> rbf_func = std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[0]);
+
+
+
 if(crest_type != -1)
 { 
     // std::span<mtet::TetId>(metric_list.activeTetId)
@@ -481,6 +484,8 @@ if(crest_type != -1)
             pt_curv.kmin_ = curv_data.k2_;
             pt_curv.de1_  = {curv_data.e1_d1_[0], curv_data.e1_d1_[1], curv_data.e1_d1_[2]};
             pt_curv.de2_  = {curv_data.e2_d2_[0], curv_data.e2_d2_[1], curv_data.e2_d2_[2]};
+            pt_curv.emax_prime_ = curv_data.e1_prime_;
+            pt_curv.emin_prime_ = curv_data.e2_prime_;
             tet_curvatures.push_back(pt_curv);
             // values[id] = func->evaluate_gradient(data[0], data[1], data[2], gradients[id][0], gradients[id][1], gradients[id][2]);           
         counter ++;   
@@ -522,12 +527,13 @@ if(crest_type != -1)
     //     std::cout << "k2 " << curv_data.k2_ << " , e2 " << curv_data.e2_ << " de2 " << curv_data.e2_d2_ << std::endl;
     // }
 
-    // get_function_val_and_gradients(grid_mesh, metric_list.vertex_func_grad_map, values, gradients);
+    
     
     // get_function_val_and_gradients_from_funcs(vertices, functions[0], values, gradients);
     // marching3D::MarchingTet3D( vertices, tets, values, gradients, output_vertices, output_triangles);
     // marching3D::MarchingTet3DEdges( vertices, tets, values, gradients, output_vertices, output_triangles);
-    
+    if(crest_type != -1)
+    {
     std::string unoriented_tets_path = outdir + "unoriented_tets_all_" + filename+ ".obj";
     std::string unoriented_tets_unsplit_path = outdir + "unoriented_tets_unsplit_" + filename +".obj";
     std::string unoriented_tets_split_path = outdir + "unoriented_tets_split" + filename +".obj";
@@ -538,17 +544,28 @@ if(crest_type != -1)
     std::string threshold_tets_path = outdir + "threshold_tets_" + filename +".obj";
     OutTetObj::threshold_tets.SaveTetDataToObj(threshold_tets_path);
 
-    std::string limit_unorientable_tets_path = outdir + "limit_unorientable_tets_" + filename +".obj";
+    
     std::string limit_orientable_tets_path = outdir + "limit_orientable_tets_" + filename +".obj";
     std::string rv_fail_tets_path = outdir + "rv_fail_tets_" + filename +".obj";
+    std::string eprime_fail_tets_path = outdir + "eprime_fail_tets" +".obj";
     
-    OutTetObj::limit_unorientable_tets.SaveTetDataToObj(limit_unorientable_tets_path);
+    
+    std::string boundary1_tets_path = outdir + "boundary1_unorientable_tets"  +".obj";
+    std::string boundary2_tets_path = outdir + "boundary2_RV_tets"  +".obj";
+    std::string boundary3_tets_path = outdir + "boundary3_eprime_tets"  +".obj";
+    OutTetObj::boundary1_unorientable_tets .SaveTetDataToObj(boundary1_tets_path);
+    OutTetObj::boundary2_RV_tets.SaveTetDataToObj(boundary2_tets_path);
+    OutTetObj::boundary3_eprime_tets.SaveTetDataToObj(boundary3_tets_path);
     OutTetObj::limit_orientable_tets.SaveTetDataToObj(limit_orientable_tets_path);
     OutTetObj::rv_failed_tets.SaveTetDataToObj(rv_fail_tets_path);
+    OutTetObj::eprime_failed_tets.SaveTetDataToObj(eprime_fail_tets_path);
+        
+    }
 
     if(crest_type == -1)
     {
-        marching3D::MarchingTet3D( vertices, tets, values, gradients, output_vertices, output_triangles);
+        get_function_val_and_gradients(grid_mesh, metric_list.vertex_func_grad_map, values, gradients);
+        marching3D::MarchingTet3D(vertices, tets, values, gradients, output_vertices, output_triangles);
 
     } else {
         std::cout << " start MarchingTet3DCrestMesh ...... "<< std::endl;

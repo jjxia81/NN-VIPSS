@@ -79,12 +79,13 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid_mesh,
 
     bool isActive = 0;
     bool orientable = false;
+    int boundary_type = 0;
     bool subResult;
     {
         // int crest_type = 1;
         // std::cout << " start critIARidge .... " << std::endl;
         // Timer sub_timer(subdivision, [&](auto profileResult){profileTimer = combine_timer(profileTimer, profileResult);});
-        subResult = critIARidge(pts, tet_info, tid, grid_mesh, funcNum, threshold, curve_network, crest_type, isActive,orientable, sub_call_two, sub_call_three);
+        subResult = critIARidge(pts, tet_info, tid, grid_mesh, funcNum, threshold, curve_network, crest_type, isActive,orientable, sub_call_two, sub_call_three, boundary_type);
         // std::cout << " finish critIARidge .... " << std::endl;
         // switch (mode){
         //     case IA:
@@ -124,12 +125,31 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid_mesh,
         {
             Q.emplace_back(longest_edge_length, longest_edge);
         } else {
-            if(orientable)
+            switch (boundary_type)
             {
+            case 0:
                 OutTetObj::limit_orientable_tets.AddNewTet(pts);
-            } else {
-                OutTetObj::limit_unorientable_tets.AddNewTet(pts);
+                break;
+            case 1:
+                OutTetObj::boundary1_unorientable_tets.AddNewTet(pts);
+                break;
+            case 2:
+                OutTetObj::boundary2_RV_tets.AddNewTet(pts);
+                break;
+            case 3:
+                OutTetObj::boundary3_eprime_tets.AddNewTet(pts);
+                break;
+            
+            default:
+                break;
             }
+            // if(orientable)
+            // {
+            //     OutTetObj::limit_orientable_tets.AddNewTet(pts);
+            // } else {
+                
+            //     OutTetObj::limit_unorientable_tets.AddNewTet(pts);
+            // }
             
         }
         //eval_timer.Stop();

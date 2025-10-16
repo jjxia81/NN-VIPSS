@@ -39,7 +39,7 @@ include_directories(./adgrid/src )
 include_directories(./adgrid/include/mshio )
 
 find_library(ATOMIC_LIB atomic_ops REQUIRED)
-message(STATUS "MY_VAR is: ${ATOMIC_LIB}")
+# message(STATUS "MY_VAR is: ${ATOMIC_LIB}")
 # message(STATUS  ${ATOMIC_LIB})
 
 add_library(adgrid ${ADGRID_LIST}  ${NANOTHREAD_LIST} ${MSHIO_LIST} ${PREDICATES_LIST} ${MTET_LIST})

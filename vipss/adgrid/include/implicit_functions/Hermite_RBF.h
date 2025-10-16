@@ -21,6 +21,8 @@ class CurvatureData {
         Scalar e2_;
         Vec3 e1_d1_; 
         Vec3 e2_d2_;
+        Scalar e1_prime_;
+        Scalar e2_prime_;
 };
 
 
@@ -193,7 +195,7 @@ public:
         return ;
     }
 
-    void ComputeThirdDerivatives(double x, double y, double z, std::vector<Mat33>& third_derivs) const
+    void ComputeThirdDerivatives(const double x, const double y, const double z, std::vector<Mat33>& third_derivs) const
     {
         // Scalar h = 1e-8;
         Scalar h = 1e-6;
@@ -214,6 +216,91 @@ public:
         third_derivs[0] = (hessian_xp - hessian_xn) / (2 * h); // H_x = dH/dx
         third_derivs[1] = (hessian_yp - hessian_yn) / (2 * h); // H_y = dH/dy
         third_derivs[2] = (hessian_zp - hessian_zn) / (2 * h); // H_z = dH/dz
+    }
+
+    
+    void ComputeFourthDerivatives(double x, double y, double z, std::vector<std::vector<Mat33>>& fourth_derivs) const
+    {
+        Scalar h = 1e-6;
+        std::vector<Mat33> third_derivs_xp;
+        ComputeThirdDerivatives(x + h, y, z, third_derivs_xp);
+        std::vector<Mat33> third_derivs_xn;
+        ComputeThirdDerivatives(x - h, y, z, third_derivs_xn);
+
+        std::vector<Mat33> third_derivs_yp;
+        ComputeThirdDerivatives(x, y + h, z, third_derivs_yp);
+        std::vector<Mat33> third_derivs_yn;
+        ComputeThirdDerivatives(x, y - h, z, third_derivs_yn);
+
+        std::vector<Mat33> third_derivs_zp;
+        ComputeThirdDerivatives(x, y, z + h, third_derivs_zp);
+        std::vector<Mat33> third_derivs_zn;
+        ComputeThirdDerivatives(x, y, z - h, third_derivs_zn);
+
+        fourth_derivs.resize(3);
+        for(int i = 0; i < 3; ++i)
+        {
+            Mat33 fourth_deriv_x = (third_derivs_xp[i] - third_derivs_xn[i]) / (2 * h); 
+            Mat33 fourth_deriv_y = (third_derivs_yp[i] - third_derivs_zn[i]) / (2 * h); 
+            Mat33 fourth_deriv_z = (third_derivs_zp[i] - third_derivs_zn[i]) / (2 * h); 
+            fourth_derivs[0].push_back(fourth_deriv_x);
+            fourth_derivs[1].push_back(fourth_deriv_y);
+            fourth_derivs[2].push_back(fourth_deriv_z);
+        }
+    }
+
+    
+    Scalar ComputeCurvatureSecondDerivative(const Vec3& gradient, 
+                                            const Mat33& Hessian,
+                                            const std::vector<Mat33>& third_derivs, 
+                                            const std::vector<std::vector<Mat33>>& fourth_derivs,
+                                            const Vec3& t1,
+                                            const Scalar k1, 
+                                            const Scalar e1) const
+    {
+
+        Scalar g_norm = sqrt(gradient[0] * gradient[0] + gradient[1]* gradient[1] + gradient[2] * gradient[2]);
+        // auto normalized_t = arma::normalise(t1); 
+        Scalar sum1 = 0;
+        for(int i = 0; i < 3; ++i)
+        {
+            for(int j = 0; j < 3; ++j)
+            {
+                for(int l = 0; l < 3; ++l)
+                {
+                    for(int m = 0; m < 3; ++m)
+                    {
+                        // sum1 += fourth_derivs[i](j,l,m) * t1[i] * t1[j] * t1[l] * t1[m];
+                        sum1 += fourth_derivs[i][j](l,m) * t1[i] * t1[j] * t1[l] * t1[m];
+                    }
+                }
+            }
+        }
+
+        Scalar sum2 = 0;
+        for(int i = 0; i < 3; ++i)
+        {
+            for(int j = 0; j < 3; ++j)
+            {
+                for(int l = 0; l < 3; ++l)
+                {
+                    sum2 += third_derivs[i](j, l) * t1[i] * t1[j] * gradient[l] * 6 * k1;
+                }
+            }
+        }
+
+        Scalar sum3 = 0;
+        for(int i = 0; i < 3; ++i)
+        {
+            for(int j = 0; j < 3; ++j)
+            {
+                sum3 += (Hessian(i,j) * t1[i] * gradient[j] * 4 * e1 
+                    + Hessian(i,j) * gradient[i] * gradient[j] * 3 * k1 * k1);  
+            }
+        }
+
+        Scalar result = (sum1 + sum2 + sum3) / g_norm - 3 * k1 * k1 *k1;
+        return result;
     }
 
     // Compute principal curvatures and directions using the method from Monga et al.
@@ -256,21 +343,28 @@ public:
         Vec3 gradient;
         double f_val_ = evaluate_gradient(x, y, z, gradient[0], gradient[1], gradient[2]);
         // std::cout << " cur_data.f_val_ " << cur_data.f_val_ << std::endl;
-        
         // std::cout << " Hrbf : finish evaluate_gradient ..." << std::endl;
         Mat33 hessian = Mat33::Zero();
         EvaluateHessian(x, y, z, hessian);
         // std::cout << " Hrbf : finish EvaluateHessian ..." << std::endl;
         std::vector<Mat33> third_derivs;
         ComputeThirdDerivatives(x, y, z, third_derivs);
-        // std::cout << " Hrbf : finish ComputeThirdDerivatives ..." << std::endl;
+
+        std::vector<std::vector<Mat33>> fourth_derivs;
+        ComputeFourthDerivatives(x, y, z, fourth_derivs);
+        // std::cout << " Hrbf : finish ComputeFourthDerivatives ..." << std::endl;
+
+        // ComputeThirdDerivatives
         cur_data = ComputePrincipalCurvaturesMonga(gradient, hessian);
         // std::cout << " Hrbf : finish ComputePrincipalCurvaturesMonga ..." << std::endl;
         cur_data.e1_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t1_);
         cur_data.e2_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t2_);
-        // std::cout << " Hrbf : finish ComputeCurvatureDerivative ..." << std::endl;
-        // ComputeCurvatureDerivative2({x,y,z}, cur_data.t1_, cur_data.e1_d1_);
-        // ComputeCurvatureDerivative2({x,y,z}, cur_data.t2_, cur_data.e2_d2_);
+        
+        cur_data.e1_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
+                                         fourth_derivs, cur_data.t1_, cur_data.k1_, cur_data.e1_);
+        cur_data.e2_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
+                                         fourth_derivs, cur_data.t2_, cur_data.k2_, cur_data.e2_);    
+        
         cur_data.f_gradient_ = gradient;
         cur_data.f_val_ = f_val_;
         // std::cout << " Hrbf : finish ComputeCurvatureDerivative2 ..." << std::endl;

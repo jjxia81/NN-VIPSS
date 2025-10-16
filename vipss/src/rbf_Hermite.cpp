@@ -673,7 +673,7 @@ int RBF_Core::Opt_Hermite_PredictNormal_UnitNormal(){
         newnormals[i*3+2] = y(npt+i+key_npt*2) = cos(a);
         MyUtility::normalize(newnormals.data()+i*3);
     }
-    y *= -1.0;
+    // y *= -1.0;
     Set_RBFCoef(y);
 
     //sol.energy = arma::dot(a,M*a);
