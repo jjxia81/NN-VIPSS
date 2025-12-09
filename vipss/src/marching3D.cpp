@@ -1284,13 +1284,13 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
       points[i] = {vertices[i][0],vertices[i][1], vertices[i][2]};
     }
     std::vector<Vec> pt_gradients;
-    auto hrbf_ptr = VIPSSRidges::g_hrfb_ptr;
-    VIPSSRidges::CalMeshPointsGradient(hrbf_ptr, points, pt_gradients);
+    // auto hrbf_ptr = VIPSSRidges::g_hrfb_ptr;
+    // VIPSSRidges::CalMeshPointsGradient(hrbf_ptr, points, pt_gradients);
     
     std::cout << "finihs cal tet gradients " << std::endl;
     
     std::vector<PrincipleCurvature> pt_curvatures;
-    VIPSSRidges::CalMeshPointsCurvature(hrbf_ptr, points, pt_gradients, pt_curvatures);
+    // VIPSSRidges::CalMeshPointsCurvature(hrbf_ptr, points, pt_gradients, pt_curvatures);
 
     std::cout << "finihs cal tet pt_curvatures " << std::endl;
 
@@ -1684,11 +1684,13 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
         emax_center[1] += emax_inter_pts[emax_pid][1];
         emax_center[2] += emax_inter_pts[emax_pid][2];
       }
+      size_t emax_center_id = emax_inter_pts.size();
       if(new_emax_ids.size() > 0)
       {
         emax_center[0] /= new_emax_ids.size();
         emax_center[1] /= new_emax_ids.size();
         emax_center[2] /= new_emax_ids.size();
+        emax_inter_pts.push_back(emax_center);
       }
       for(auto emin_pid : new_emin_ids)
       {
@@ -1696,16 +1698,14 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
         emin_center[1] += emin_inter_pts[emin_pid][1];
         emin_center[2] += emin_inter_pts[emin_pid][2];
       }
+      size_t emin_center_id = emin_inter_pts.size();
       if(new_emin_ids.size() > 0)
       {
         emin_center[0] /= new_emin_ids.size();
         emin_center[1] /= new_emin_ids.size();
         emin_center[2] /= new_emin_ids.size();
+        emin_inter_pts.push_back(emin_center);
       }
-      size_t emax_center_id = emax_inter_pts.size();
-      emax_inter_pts.push_back(emax_center);
-      size_t emin_center_id = emin_inter_pts.size();
-      emin_inter_pts.push_back(emin_center);
       for(const auto& face: tet_faces3D)
       {
         auto [v1, v2, v3] = face;
@@ -1731,12 +1731,10 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
         }
       }
     }
-
     std::string ridge_mesh_save_path =  out_dir + "ridge_mesh.ply";
     std::string valley_mesh_save_path = out_dir + "valley_mesh.ply";
     SaveMeshToPly(ridge_mesh_save_path, emax_inter_pts, emax_mesh_faces);
     SaveMeshToPly(valley_mesh_save_path, emin_inter_pts, emin_mesh_faces);
-
 
     std::string tet_edges_save_path = out_dir + "tet_out_edges.obj";
     VIPSSRidges::SaveRidgesToObj(tet_edges_save_path, 

@@ -857,6 +857,7 @@ void VIPSSUnit::GenerateAdaptiveGrid()
     } else {
         std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<HRBFDistanceFunction>(iso_offset_val_);
         // hrbf_func->SetIsoOffset(iso_offset_val_);
+
         
         functions.push_back(hrbf_func);
         auto t000 = Clock::now();   
@@ -867,21 +868,16 @@ void VIPSSUnit::GenerateAdaptiveGrid()
                                 out_dir_,  
                                 file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
         auto t001 = Clock::now();
-
         for(auto& pt : output_vertices)
         {
             pt[0] = pt[0] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[0];
             pt[1] = pt[1] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[1];
             pt[2] = pt[2] *  local_vipss_.in_pt_scale_ + local_vipss_.in_pt_center_[2];
         }
-        
         SaveMeshToPly(out_surface_path_, output_vertices, output_triangles);
         G_VP_stats.adgrid_gen_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;
-
         printf("adaptive grid generation time : %f ! \n", G_VP_stats.adgrid_gen_time_);
     }
-
-    
 }
 
 void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf, 
@@ -923,6 +919,7 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
     hrbf_a.resize(g_hrbf->a.size());
 
     std::cout << " g_hrbf->a.size() " << g_hrbf->a.size() << std::endl;
+    // std::cout << " g_hrbf->a.size() " << g_hrbf->a << std::endl;
     for(int i = 0; i < g_hrbf->a.size(); ++i)
     {
         hrbf_a[i] = g_hrbf->a[i];
@@ -934,6 +931,22 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
     }
     std::shared_ptr<ImplicitFunction<double>> hrbf_func = std::make_shared<Hermite_RBF<double>>(in_points, hrbf_a, hrbf_b, iso_offset_val_);
     
+    // int count = 0;
+    // for(const auto& pt : in_points)
+    // {
+    //     double dist = hrbf_func->evaluate(pt[0], pt[1], pt[2]);
+    //     std::cout << " hrbf dist " << dist << std::endl;
+    //     dist = g_hrbf->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
+    //     std::cout << " hrbf dist -- " << dist << std::endl;
+    //     count ++;
+    //     if(count > 5) break;
+    // }
+    // std::make_shared<ImplicitFunctionRidge<double>>();
+
+    // std::shared_ptr<ImplicitFunctionRidge<double>> hrbf_func = std::make_shared<ImplicitFunctionRidge<double>>(in_points, iso_offset_val_);
+    
+    // std::shared_ptr<ImplicitFunction<double>> newhrbf_func ()
+    // std::shared_ptr<ImplicitFunction<double>> newhrbf_func = std::make_shared<ImplicitFunctionRidge<double>>(in_points, iso_offset_val_);
     functions.push_back(hrbf_func);
     auto g_t1 = Clock::now();
     auto t000 = Clock::now();
@@ -942,10 +955,8 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
       
     GenerateAdaptiveGridOut(resolution, bbox_min, bbox_max, crest_type, tet_size_limit, out_dir_,  
                             file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
-    
     auto t001 = Clock::now();
     G_VP_stats.adgrid_gen_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;
-
     printf("adaptive grid generation time : %f ! \n", G_VP_stats.adgrid_gen_time_);
 
 }
@@ -1325,25 +1336,56 @@ void VIPSSUnit::RunRidgesGHRBF2()
     // local_vipss_.Init(pts);
     
     std::cout << " read input pts size :  " << pts.size() / 3 << std::endl;
-    std::shared_ptr<RBF_Core> rfb_ptr = std::make_shared<RBF_Core>();
-    bool use_input_normal = false;
-    if(use_input_normal)
+    std::shared_ptr<RBF_Core> rbf_ptr = std::make_shared<RBF_Core>();
+    bool use_input_normal = true;
+    std::vector<double> s_vals(pts.size()/3, -10);
+    if(!use_input_normal)
     {
-        for(int i =0; i <pt_normals.size()/3; ++i)
-        {
-            double len = sqrt(pt_normals[3*i] * pt_normals[3*i] 
-                            + pt_normals[3*i + 1] * pt_normals[3*i + 1]
-                            + pt_normals[3*i + 2] * pt_normals[3*i + 2]);
-            pt_normals[3*i] /= len;
-            pt_normals[3*i + 1] /= len;      
-            pt_normals[3*i + 2] /= len;          
-        }
-        BuildGlobalHRBFVipssWithNormals(pts, pt_normals, rfb_ptr, user_lambda_);
-    } else {
         // user_lambda_ = 0.0001;
-        BuildGlobalHRBFVipss(pts, rfb_ptr, user_lambda_);
+        BuildGlobalHRBFVipss(pts, rbf_ptr, user_lambda_);
+        rbf_ptr->Write_Hermite_NormalPrediction(out_dir_ + "estimated_normal", 1);
+        pt_normals = rbf_ptr->newnormals;
+        s_vals = rbf_ptr->iso_vals_;
+    } 
+
+    for(int i = 0; i < pts.size()/3; ++i)
+    {
+        s_vals[i] = -1.0;
     }
-    rfb_ptr->Write_Hermite_NormalPrediction(out_dir_ + "estimated_normal", 1);
+
+    // for(int i = 0; i < pts.size()/3; ++i)
+    // {
+    //     if(i < 200)
+    //     {
+    //         s_vals[i] = 0.0;
+    //     } else {
+    //         s_vals[i] = -1.0;
+    //     }
+    // }
+
+    for(int i =0; i <pt_normals.size()/3; ++i)
+    {
+        double len = sqrt(pt_normals[3*i] * pt_normals[3*i] 
+                        + pt_normals[3*i + 1] * pt_normals[3*i + 1]
+                        + pt_normals[3*i + 2] * pt_normals[3*i + 2]);
+        if(abs(len) > 1e-12)
+        {
+            pt_normals[3*i] /= -len;
+            pt_normals[3*i + 1] /= -len;      
+            pt_normals[3*i + 2] /= -len; 
+        }
+    }
+    
+    BuildGlobalHRBFVipssWithNormals(pts, pt_normals, s_vals, rbf_ptr, user_lambda_, RBF_Kernal::FifthPower);
+    // for(int i = 0; i < pts.size()/3; ++i)
+    // {
+    //     double dist_val = rbf_ptr->Dist_Function(R3Pt(pts[3*i], pts[3*i + 1], pts[3*i + 2]));
+    //     std::cout << " rbf val : " << dist_val << std::endl;
+    //     if(i > 5) break;
+    // }
+    // BuildGlobalHRBFVipssWithNormals(pts, pt_normals, s_vals, rbf_ptr, user_lambda_,RBF_Kernal::XCube);
+    // BuildGlobalHRBFVipssWithNormals(pts, pt_normals, s_vals,rbf_ptr, user_lambda_, 
+    //     RBF_Kernal::XCube);
     // adgrid_threshold_ = 0.005;
     std::vector<std::array<double, 3> > output_vertices;
     std::vector<std::array<size_t, 3> > output_triangles;
@@ -1362,20 +1404,15 @@ void VIPSSUnit::RunRidgesGHRBF2()
     // {
     //     output_triangles[i] = {finalMesh_fv_[3*i],  finalMesh_fv_[3*i + 1], finalMesh_fv_[3*i + 2] };
     // }
-    vipss_ridges_.hrfb_ptr_ = rfb_ptr;
-    vipss_ridges_.g_hrfb_ptr = rfb_ptr;
-    AdaptiveGridHRBF(rfb_ptr, output_vertices, output_triangles);
-
+    vipss_ridges_.hrfb_ptr_ = rbf_ptr;
+    vipss_ridges_.g_hrfb_ptr = rbf_ptr;
+    AdaptiveGridHRBF(rbf_ptr, output_vertices, output_triangles);
     std::cout << "outvertices :  " << output_vertices.size() << std::endl;
     std::cout << "output_triangles :  " << output_triangles.size() << std::endl;
-
-    
     auto tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh" + std::to_string(user_lambda_)+".ply";
     SaveMeshToPly(tet_mesh_path, output_vertices, output_triangles);
-
     std::string ridge_mesh_save_path =  out_dir_ + "ridge_mesh.ply";
     std::string valley_mesh_save_path = out_dir_ + "valley_mesh.ply";
-
     std::vector<std::array<double, 3>> ridge_mesh_pts;
     std::vector<std::array<double, 3>> valley_mesh_pts;
     std::vector<std::vector<size_t>> ridge_mesh_faces;
@@ -1385,22 +1422,39 @@ void VIPSSUnit::RunRidgesGHRBF2()
 
     std::vector<double> ridge_mesh_pts_dist_vals; 
     std::vector<double> valle_mesh_pts_dist_vals;
-    for(const auto& pt : ridge_mesh_pts)
-    {
-        double dist = rfb_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
-        ridge_mesh_pts_dist_vals.push_back(dist);
-    }
-    for(const auto& pt : valley_mesh_pts)
-    {
-        double dist = rfb_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
-        valle_mesh_pts_dist_vals.push_back(dist);
-    }
+    std::vector<double> ridge_mesh_pts_k1_vals; 
+
+    // auto hrbf_func = std::make_shared<Hermite_RBF<double>>(in_points, hrbf_a, hrbf_b, iso_offset_val_);
+    // auto hrbf_func  = Hermite_RBF<double>::hrbf_ptr_;
+    // for(const auto& pt : ridge_mesh_pts)
+    // {
+    //     PrincipleCurvature cur_cuv_data;
+    //     VIPSSRidges::CalSinglePointCurvatureData(pt, cur_cuv_data);
+    //     // hrbf_func->evaluate_gradient()
+    //     // CurvatureData<double> curv_data;
+    //     // hrbf_func->EvaluateCurvatureData(pt[0], pt[1], pt[2], curv_data);
+    //     ridge_mesh_pts_k1_vals.push_back(cur_cuv_data.k1_);
+    //     double dist = rbf_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
+    //     ridge_mesh_pts_dist_vals.push_back(dist);
+    // }
+    // for(const auto& pt : valley_mesh_pts)
+    // {
+    //     double dist = rbf_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
+    //     valle_mesh_pts_dist_vals.push_back(dist);
+    // }
+    std::string ridge_mesh_quality_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_quality.ply";
+    // SaveMeshWithQualityToPly(ridge_mesh_quality_path, ridge_mesh_pts, ridge_mesh_pts_k1_vals, ridge_mesh_faces);
+
+    return;
+    
     // std::string ridge_mesh_curve_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_curve_0.obj";
     // VIPSSRidges::ExtractLevelSetCurvesOnMesh(ridge_mesh_pts, ridge_mesh_faces, 
     //                         ridge_mesh_pts_dist_vals, ridge_mesh_curve_path, 0);
     
     // double offset_step = 0.05;
-    double offset_step = 0.01; int offset_num = 4;
+ 
+    double offset_step = 0.01;
+    int offset_num = 4;
     for(int i = -offset_num; i <= offset_num; ++i)
     {
         double cur_offset_val = offset_step * i;
@@ -1411,16 +1465,27 @@ void VIPSSUnit::RunRidgesGHRBF2()
                                 + std::to_string(cur_offset_val) + ".obj";
         VIPSSRidges::ExtractLevelSetCurvesOnMesh(ridge_mesh_pts, ridge_mesh_faces, 
                             ridge_mesh_pts_dist_vals, ridge_mesh_curve_path, cur_offset_val, color);
-
-        
     }
-    
-    
+
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(4) << 0.0;
+    std::string curve_key = oss.str();
+    // auto& inter_pts = curves_pts_map[key];
+    // auto& curve_edges = curves_edges_map[key];
+    double max_iso_val = 0.1;
+    if(0)
+    {
+    std::string curve_consistence_path = out_dir_ + "/" + file_name_ +"_ridge_curve_consistence.ply";
+    VIPSSRidges::CalCurvesPtsConsistence( ridge_mesh_pts,  ridge_mesh_faces, ridge_mesh_pts_dist_vals,
+                curve_key, curve_consistence_path, max_iso_val);
+    std::cout << " finish CalCurvesPtsConsistence " << std::endl;
+    std::string curve_search_pt_path = out_dir_ + "/search_pts_all.ply";
+    SavePointsWithQualityToPLY(curve_search_pt_path, VIPSSRidges::search_pts_all, VIPSSRidges::search_pts_iso_vals);
 
     std::string valle_mesh_curve_path = out_dir_ + "/" + file_name_ +"_valleMesh_curve.obj";
     VIPSSRidges::ExtractLevelSetCurvesOnMesh(valley_mesh_pts, valley_mesh_faces, 
                             valle_mesh_pts_dist_vals, valle_mesh_curve_path, 0, {0,0,0});
-
+    }
     // vipss_ridges_.ProjectMeshPtsToSurface(output_vertices, rfb_ptr);
     // tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh_projected" + std::to_string(user_lambda_)+".ply";
     // SaveMeshToPly(tet_mesh_path, output_vertices, output_triangles);
@@ -1452,8 +1517,10 @@ void VIPSSUnit::RunRidgesGHRBF2()
     vipss_ridges_.mesh_faces_ = output_triangles;
     // std::string ball_mesh_path = "/home/jjxia/Documents/prejects/VIPSS_LOCAL/data/arche/sphere_mesh_3.ply";
     // readPlyMesh(ball_mesh_path, vipss_ridges_.ball_pts_, vipss_ridges_.ball_faces_);
-    vipss_ridges_.hrfb_ptr_ = rfb_ptr;
+    vipss_ridges_.hrfb_ptr_ = rbf_ptr;
     
+    if(0)
+    {
     vipss_ridges_.CalculateRidgeEdgesFromMesh2();
     std::string save_name = out_dir_ + "/" + file_name_ +"_";
     vipss_ridges_.SaveMeshCurvaturesVisualResults(save_name);
@@ -1465,7 +1532,7 @@ void VIPSSUnit::RunRidgesGHRBF2()
     std::string ridge_valley_save_path_ = out_dir_ + "/" + file_name_ + "_out_valley_l" + std::to_string(user_lambda_)+  ".obj";
     vipss_ridges_.SaveRidgesToObj(ridge_valley_save_path_, 
         vipss_ridges_.edge_valley_pts_, vipss_ridges_.out_valley_edges_, vipss_ridges_.scale_, vipss_ridges_.ori_center_);
-
+    }
     // std::string ridge_gaussian_save_path_ = out_dir_ + "/" + file_name_ + "_out_gaussian_l" + std::to_string(user_lambda_)+  ".obj";
     // vipss_ridges_.SaveRidgesToObj(ridge_gaussian_save_path_, 
     //     vipss_ridges_.edge_gaussian_pts_, vipss_ridges_.out_gaussian_edges_);

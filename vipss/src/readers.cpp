@@ -1446,8 +1446,26 @@ bool writeXYZ(string filename, vector<double>&v){
     }
     outer.close();
     return true;
+}
+
+bool writeXYZ(string filename, std::vector<arma::vec3>&v){
+
+    size_t npt = v.size();
+    ofstream outer(filename.data(), ofstream::out);
+    if (!outer.good()) {
+        cout << "Can not create output file " << filename << endl;
+        return false;
+    }
+
+    for(size_t i=0;i<npt;++i){
+        auto p_v = v[i];
+        outer<<p_v[0]<<' '<<p_v[1]<<' '<<p_v[2]<<endl;
+    }
+    outer.close();
+    return true;
 
 }
+
 
 bool writeXYZnormal(string filename, vector<double>&v, vector<double>&vn){
 
@@ -1467,6 +1485,46 @@ bool writeXYZnormal(string filename, vector<double>&v, vector<double>&vn){
     outer.close();
     return true;
 
+}
+
+
+bool writeXYZnormal(string filename, vector<std::array<double,3>>&v, vector<std::array<double,3>>&vn){
+
+    size_t npt = v.size();
+    ofstream outer(filename.data(), ofstream::out);
+    if (!outer.good()) {
+        cout << "Can not create output file " << filename << endl;
+        return false;
+    }
+
+    for(size_t i=0;i<npt;++i){
+        auto p_v = v[i];
+        auto p_vn = vn[i];
+        outer<<p_v[0]<<' '<<p_v[1]<<' '<<p_v[2]<<' ';
+        outer<<p_vn[0]<<' '<<p_vn[1]<<' '<<p_vn[2]<<endl;
+    }
+    outer.close();
+    return true;
+
+}
+
+bool writeXYZnormal(std::string filename, std::vector<arma::vec3>&v, std::vector<arma::vec3>&vn)
+{
+    size_t npt = v.size();
+    ofstream outer(filename.data(), ofstream::out);
+    if (!outer.good()) {
+        cout << "Can not create output file " << filename << endl;
+        return false;
+    }
+
+    for(size_t i=0;i<npt;++i){
+        auto p_v = v[i];
+        auto p_vn = vn[i];
+        outer<<p_v[0]<<' '<<p_v[1]<<' '<<p_v[2]<<' ';
+        outer<<p_vn[0]<<' '<<p_vn[1]<<' '<<p_vn[2]<<endl;
+    }
+    outer.close();
+    return true;
 }
 
 bool readPlyMesh(const std::string& filename, std::vector<std::array<double, 3>>& vts, std::vector<std::vector<size_t>>& faces)
@@ -1765,6 +1823,46 @@ void SaveMeshWithQualityToPly(const std::string &filename,
 }
 
 
+void SaveMeshWithQualityToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<double>& point_qualities,
+               const std::vector<std::vector<size_t>> &faces) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        std::cerr << "Error: Unable to open file for writing!\n";
+        return;
+    }
+
+    // Write PLY header
+    outFile << "ply\n";
+    outFile << "format ascii 1.0\n";
+    outFile << "element vertex " << points.size() << "\n";
+    outFile << "property float x\n";
+    outFile << "property float y\n";
+    outFile << "property float z\n";
+    outFile << "property float quality\n";  // Quality attribute
+    outFile << "element face " << faces.size() << "\n";
+    outFile << "property list uchar int vertex_indices\n";
+    outFile << "end_header\n";
+
+    // Write vertex data
+    for (int i= 0; i < points.size(); ++i) {
+        const auto& p = points[i];
+        double quality = point_qualities[i];
+        outFile << p[0] << " " << p[1] << " " << p[2] << " " << quality << "\n";
+    }
+
+    // Write face data
+    for (const auto &face : faces) {
+        outFile << face.size();
+        outFile << " " << face[0] << " " << face[1] << " " << face[2] << std::endl;
+        
+    }
+
+    outFile.close();
+    std::cout << "PLY file saved successfully: " << filename << std::endl;
+}
+
 
 void SaveMeshToPly(const std::string &filename, 
                const std::vector<std::array<double,3>> &points, 
@@ -1893,8 +1991,8 @@ void GetTetEdges(const vector<array<size_t, 4>>& tets, std::vector<std::array<si
     {
         for(const auto& e : tet_edges)
         {
-            int pa_id = tet[e[0]];  
-            int pb_id = tet[e[1]];  
+            size_t pa_id = tet[e[0]];  
+            size_t pb_id = tet[e[1]];  
             std::array<size_t, 2> edge = pa_id < pb_id ? std::array<size_t, 2>{pa_id, pb_id} 
                                                         : std::array<size_t, 2>{pb_id, pa_id};
             string e_key = std::to_string(edge[0]) + "_" + std::to_string(edge[1]);
@@ -2013,6 +2111,36 @@ void SavePointsWithQualityToPLY(const std::string& filename,
     std::cout << "PLY file saved: " << filename << std::endl;
 }
 
+
+void SavePointsWithQualityToPLY(const std::string& filename, 
+    const std::vector<arma::vec3>& points,
+    const std::vector<double>& qualtity) {
+    //  const std::vector<Point>& points, const std::vector<Edge>& edges
+    std::ofstream file(filename);
+    if (!file) {
+        std::cerr << "Error: Unable to open file " << filename << std::endl;
+        return;
+    }
+
+    // Write PLY header
+    file << "ply\n";
+    file << "format ascii 1.0\n";
+    file << "element vertex " << points.size() << "\n";
+    file << "property float x\n";
+    file << "property float y\n";
+    file << "property float z\n";
+    file << "property float quality\n";
+    file << "end_header\n";
+    // Write vertex data
+    for (int i =0; i < points.size(); ++i) {
+        const auto& point = points[i];
+        
+        file << point[0] << " " << point[1] << " " << point[2] << " " << qualtity[i] << "\n";
+    }
+
+    file.close();
+    std::cout << "PLY file saved: " << filename << std::endl;
+}
 
 // Save vertices and tetrahedra to text file
 bool SaveTetToFile(const std::vector<std::array<double, 3>>& vertices, 

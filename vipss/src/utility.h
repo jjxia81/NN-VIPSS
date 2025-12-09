@@ -49,6 +49,7 @@ inline void GetExtName (const std::string& fullfilename,std::string &extname) {
 }
 
 /*************************************************************/
+
 template <class T>
 inline T dot(const T *e1,const T *e2,const int dim = 3){
     T d = 0.0;
@@ -408,6 +409,8 @@ bool isPointOnSeg(const T *v, const T *v1, const T *v2, const T THRES){
 
     return fabs(cosine(vec1,vec2)-1)<THRES;
 }
+
+
 
 
 }//namespace

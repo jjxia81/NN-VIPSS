@@ -20,9 +20,13 @@ std::shared_ptr<RBF_Core> VIPSSRidges::hrfb_ptr_ = std::make_shared<RBF_Core>();
 std::string VIPSSRidges::out_dir_ = "./";
 std::vector<std::string> VIPSSRidges::edge_curv_values_string; 
 std::vector<std::vector<PrincipleCurvature>> VIPSSRidges::edge_sample_curv_dataset;
-
+std::vector<arma::vec3> VIPSSRidges::search_pts_all;
+std::vector<double> VIPSSRidges::search_pts_iso_vals;
 VIPSSRidges::Point VIPSSRidges::ori_center_ = {0, 0, 0};
 double VIPSSRidges::scale_ = 1.0;
+
+std::unordered_map<string, std::vector<VIPSSRidges::Point>> VIPSSRidges::curves_pts_map;
+std::unordered_map<string, std::vector<std::vector<size_t>>> VIPSSRidges::curves_edges_map;
 
 double PointDist(const std::array<double, 3>& p1, const std::array<double, 3>& p2)
 {
@@ -463,6 +467,16 @@ bool VIPSSRidges::CalMeshPointsCurvature(std::shared_ptr<RBF_Core> hrfb_ptr,
         // std::vector<arma::cube> fourth_derivs;
         // ComputeFourthDerivatives(pt, hrfb_ptr, fourth_derivs, 1e-8);
 
+        // arma::mat hessian = arma::zeros(3,3);
+        // hrfb_ptr->EvaluateHessian(pt[0], pt[1], pt[2], hessian);
+        arma::vec eigval;
+        arma::mat eigvec;
+        arma::mat H_sym = 0.5 * (hessian + hessian.t());
+        arma::eig_sym(eigval, eigvec, H_sym);
+
+        arma::vec eigval_abs = arma::abs(eigval);
+        size_t max_id = arma::index_max(eigval_abs);
+        arma::vec max_vec = eigvec.col(max_id);
 
         // std::cout << "pt " << pt[0] << " " << pt[1] << " " << pt[2] 
         // << " third : " << third_derivs << std::endl;
@@ -471,6 +485,9 @@ bool VIPSSRidges::CalMeshPointsCurvature(std::shared_ptr<RBF_Core> hrfb_ptr,
             pt, gradient, hessian, third_derivs, hrfb_ptr, pt_curvatures[i].tmax_);
         pt_curvatures[i].emin_ = ComputeCurvatureDerivative(
             pt, gradient, hessian, third_derivs, hrfb_ptr, pt_curvatures[i].tmin_);
+
+        pt_curvatures[i].tmax_ = max_vec;
+
         // if(0)
         // {
         //     pt_curvatures[i].demax_ = ComputeCurvatureSecondDerivative(pt, gradient, hessian, third_derivs, 
@@ -942,7 +959,10 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
         eb_max *= -1.0;
     } 
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
-    if(ka_max > abs(ka_min) || kb_max > abs(kb_min) )
+    // if(ka_max > abs(ka_min) || kb_max > abs(kb_min) )
+    // if(ka_max + ka_min > 0 || kb_max + kb_min > 0 )
+    // if( (ka_max < 0 && abs(ka_max) > abs(ka_min)) || (kb_max < 0 && abs(ka_max) > abs(ka_min) ) )
+    if( ka_max < 0  || kb_max < 0)
     {
         if(ea_max * eb_max < 0 && (ca.emax_prime_ <= 0 || cb.emax_prime_ <= 0))
         // if(ea_max * eb_max < 0 )
@@ -967,9 +987,10 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
         eb_min *= -1.0;
     } 
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
-    if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
+    // if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
+    if(ka_max > 0  || kb_max > 0)
     {
-        if(ea_min * eb_min < 0  && (ca.emax_prime_ > 0 || cb.emax_prime_ > 0))
+        if(ea_min * eb_min < 0  && (ca.emax_prime_ >= 0 || cb.emax_prime_ >= 0))
         // if(ea_min * eb_min < 0)
         {
             edge_emin_sign = 1;
@@ -1036,9 +1057,11 @@ bool VIPSSRidges::CalculateCrestPointsSingleQuadratic(const Point& pa, const Poi
         eb_max *= -1.0;
     } 
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
-    if(ka_max > abs(ka_min) || kb_max > abs(kb_min) )
+    // if(ka_max + ka_min > 0 || kb_max + kb_min > 0 )
+    if(ka_max < 0  || kb_max < 0)
+    // if( (ka_max < 0 && abs(ka_max) > abs(ka_min)) || (kb_max < 0 && abs(ka_max) > abs(ka_min) ) )
     {
-        if(ea_max * eb_max < 0 && (ca.emax_prime_ < 0 && cb.emax_prime_ < 0))
+        if(ea_max * eb_max < 0 && (ca.emax_prime_ <= 0 && cb.emax_prime_ <= 0))
         // if(ea_max * eb_max < 0 )
         {
             edge_emax_sign = 1;
@@ -1064,9 +1087,10 @@ bool VIPSSRidges::CalculateCrestPointsSingleQuadratic(const Point& pa, const Poi
     } 
     // condition 3 from paper "Ridge-Valley Lines on Meshes via Implicit Surface Fitting"
     // if(abs(ka_min) > abs(ka_max) || abs(kb_min) > abs(kb_max) )
-    if(ka_min + ka_max < 0 || kb_min + kb_max < 0 )
+    // if(ka_min + ka_max < 0 || kb_min + kb_max < 0 )
+    if(ka_max > 0  || kb_max > 0)
     {
-        if(ea_min * eb_min < 0 && (ca.emin_prime_ > 0 || cb.emin_prime_ > 0))
+        if(ea_min * eb_min < 0 && (ca.emin_prime_ >= 0 || cb.emin_prime_ >= 0))
         // if(ea_min * eb_min < 0)
         {
             edge_emin_sign = 1;
@@ -1510,12 +1534,932 @@ void VIPSSRidges::ExtractLevelSetCurvesOnMesh(const std::vector<Point>& mesh_poi
     // } else {
     //     color[2] = std::min(1.0, -level_val/0.2);
     // }
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(4) << level_val;
+    std::string key = oss.str();
+    curves_pts_map[key] = inter_pts;
+    curves_edges_map[key] = curve_edges;
 
     SaveRidgesToObjWithColor(curve_path, inter_pts, curve_edges, color, scale_, ori_center_);
 
     VIPSSRidges::SaveRidgesWithColorToPLY(curve_path + "_color.ply", inter_pts, curve_edges, color);
 }
 
+
+size_t locateTriFaceEdge(const std::vector<std::array<double,3>>& mesh_points, 
+                const std::vector<std::array<size_t, 2>> & all_mesh_edges,
+                const std::vector<double> &pt_vals,
+                const arma::vec3& pt, double& iso_val)
+{
+    size_t e_n = all_mesh_edges.size();
+    size_t e_id = e_n;
+    double step = 1e-6;
+    
+    for(size_t i = 0; i < e_n; ++i)
+    {
+        const auto& cur_edge = all_mesh_edges[i];
+        const auto& pa = mesh_points[cur_edge[0]];
+        const auto& pb = mesh_points[cur_edge[1]];
+        double min_x = std::min(pa[0], pb[0]) - step;
+        double min_y = std::min(pa[1], pb[1]) - step;
+        double min_z = std::min(pa[2], pb[2]) - step;
+        double max_x = std::max(pa[0], pb[0]) + step;
+        double max_y = std::max(pa[1], pb[1]) + step;
+        double max_z = std::max(pa[2], pb[2]) + step;
+
+        if(pt[0] <= max_x && pt[0] >= min_x &&
+           pt[1] <= max_y && pt[1] >= min_y &&
+           pt[2] <= max_z && pt[2] >= min_z )
+        {
+            arma::vec3 v_ab = {pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]};
+            arma::vec3 v_pa = {pt[0] - pa[0], pt[1] - pa[1], pt[2] - pa[2]};
+            arma::vec3 v_pb = {pt[0] - pb[0], pt[1] - pb[1], pt[2] - pb[2]};
+
+            double len_ab = arma::norm(v_ab);
+            double len_pa = arma::norm(v_pa);
+            double len_pb = arma::norm(v_pb);
+        
+            double len_diff_thred = 1e-6;
+            if(len_pa + len_pb - len_ab < len_diff_thred)
+            {
+                double iso_val_a = pt_vals[cur_edge[0]];
+                double iso_val_b = pt_vals[cur_edge[1]];
+                iso_val = iso_val_a + ( iso_val_b - iso_val_a) * len_pa / len_ab; 
+                return i;
+            }
+        }
+    }
+    return e_id;
+}
+
+size_t locateTriFace(const std::vector<std::array<double,3>>& mesh_points, 
+                const std::vector<std::vector<size_t>>& mesh_faces,
+                const arma::vec3& pt)
+{
+    size_t f_n = mesh_faces.size();
+    size_t f_id = f_n;
+    for(size_t i = 0; i < f_n; ++i)
+    {
+        const auto& f = mesh_faces[i];
+        const auto& pa = mesh_points[f[0]];
+        const auto& pb = mesh_points[f[1]];
+        const auto& pc = mesh_points[f[2]];
+        double min_x = std::min(pa[0], std::min(pb[0], pc[0]));
+        double min_y = std::min(pa[1], std::min(pb[1], pc[1]));
+        double min_z = std::min(pa[2], std::min(pb[2], pc[2]));
+
+        double max_x = std::max(pa[0], std::max(pb[0], pc[0]));
+        double max_y = std::max(pa[1], std::max(pb[1], pc[1]));
+        double max_z = std::max(pa[2], std::max(pb[2], pc[2]));
+        if(pt[0] <= max_x && pt[0] >= min_x &&
+            pt[1] <= max_y && pt[1] >= min_y &&
+            pt[2] <= max_z && pt[2] >= min_z)
+        {
+            arma::vec3 v_ab =  {pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]};
+            arma::vec3 v_bc =  {pc[0] - pb[0], pc[1] - pb[1], pc[2] - pb[2]};
+            arma::vec3 v_ca =  {pa[0] - pc[0], pa[1] - pc[1], pa[2] - pc[2]};
+            arma::vec3 v_pa = {pt[0] - pa[0], pt[1] - pa[1], pt[2] - pa[2]};
+            arma::vec3 v_pb = {pt[0] - pb[0], pt[1] - pb[1], pt[2] - pb[2]};
+            arma::vec3 v_pc = {pt[0] - pc[0], pt[1] - pc[1], pt[2] - pc[2]};
+            arma::vec3 cross_ap = arma::cross(v_pa, v_ab);
+            arma::vec3 cross_bp = arma::cross(v_pb, v_bc);
+            arma::vec3 cross_cp = arma::cross(v_pc, v_ca);
+            // f_id = f_id == f_n?  i : f_id;
+            if(arma::dot(cross_ap, cross_bp) >= 0 
+            && arma::dot(cross_ap, cross_cp) >= 0
+            && arma::dot(cross_bp, cross_cp) >= 0)
+            {
+                return i;
+            }
+            double len_ab = arma::norm(v_ab);
+            double len_bc = arma::norm(v_bc);
+            double len_ca = arma::norm(v_ca);
+            double len_pa = arma::norm(v_pa);
+            double len_pb = arma::norm(v_pb);
+            double len_pc = arma::norm(v_pc);
+        
+            double len_diff_thred = 1e-6;
+            if(len_pa + len_pb - len_ab < len_diff_thred)
+            {
+                return i;
+            }
+            if(len_pb + len_pc - len_bc < len_diff_thred)
+            {
+                return i;
+            }
+            if(len_pc + len_pa - len_ca < len_diff_thred)
+            {
+                return i;
+            }
+        }
+    }
+    return f_id;
+}
+
+bool CheckIntersectFace(const std::vector<std::array<double,3>>& mesh_points, 
+                    const arma::vec3& face_interplane_normal,
+                    const std::vector<size_t>& face,
+                    const arma::vec3& pt)
+{
+    std::array<std::array<size_t,2>, 3> cur_edges = {{{0, 1}, {1, 2}, {2, 0}}};
+    arma::vec3 pa = {mesh_points[face[0]][0],mesh_points[face[0]][1], mesh_points[face[0]][2]};
+    arma::vec3 pb = {mesh_points[face[1]][0],mesh_points[face[1]][1], mesh_points[face[1]][2]};
+    arma::vec3 pc = {mesh_points[face[2]][0],mesh_points[face[2]][1], mesh_points[face[2]][2]}; 
+    arma::vec3 v_pa = pa - pt;
+    arma::vec3 v_pb = pb - pt;
+    arma::vec3 v_pc = pc - pt;
+    std::vector<arma::vec3> f_pts = {pa, pb, pc};
+    double proja = arma::dot(face_interplane_normal,v_pa);
+    double projb = arma::dot(face_interplane_normal,v_pb);
+    double projc = arma::dot(face_interplane_normal,v_pc);
+    std::vector<double> pro_vals = {proja, projb, projc};
+    if(proja < 0 && projb < 0 && projc < 0) return false;
+    if(proja > 0 && projb > 0 && projc > 0) return false;
+    return true;
+}
+
+
+bool IntersectTriFace(
+                    const std::vector<std::array<double,3>>& mesh_points, 
+                    const arma::vec3& face_interplane_normal,
+                    const std::vector<size_t>& face,
+                    const arma::vec3& pt, const arma::vec3& tri_isovals, 
+                    TriFaceIntersectRes& intersect_res )
+{
+    
+    // std::array<std::array<size_t,2>, 3> cur_edges = 
+    //             {{face[0], face[1]}, {face[1], face[2]}, {face[2], face[0]}};
+    bool& has_intersect_res   = intersect_res.has_intersect_res; 
+    arma::vec3& iso_incre_pt = intersect_res.iso_incre_pt;
+    double& iso_incre_val    = intersect_res.iso_incre_val;
+    std::array<size_t,2>& incre_edge = intersect_res.incre_edge; 
+    arma::vec3& iso_decre_pt  = intersect_res.iso_decre_pt; 
+    double& iso_decre_val     = intersect_res.iso_decre_val; 
+    std::array<size_t,2>& decre_edge = intersect_res.decre_edge; 
+    std::array<std::array<size_t,2>, 3> cur_edges = {{{0, 1}, {1, 2}, {2, 0}}};
+    arma::vec3 pa = {mesh_points[face[0]][0],mesh_points[face[0]][1], mesh_points[face[0]][2]};
+    arma::vec3 pb = {mesh_points[face[1]][0],mesh_points[face[1]][1], mesh_points[face[1]][2]};
+    arma::vec3 pc = {mesh_points[face[2]][0],mesh_points[face[2]][1], mesh_points[face[2]][2]}; 
+    arma::vec3 v_pa = pa - pt;
+    arma::vec3 v_pb = pb - pt;
+    arma::vec3 v_pc = pc - pt;
+    std::vector<arma::vec3> f_pts = {pa, pb, pc};
+    double proja = arma::dot(face_interplane_normal,v_pa);
+    double projb = arma::dot(face_interplane_normal,v_pb);
+    double projc = arma::dot(face_interplane_normal,v_pc);
+    std::vector<double> pro_vals = {proja, projb, projc};
+    iso_incre_val = arma::min(tri_isovals);
+    iso_decre_val = arma::max(tri_isovals);
+    double numerical_threshold = 1e-8;
+    std::vector<size_t> intersect_edge;
+    // std::cout << "---proj vals " << proja << " " << projb << " " << projc << std::endl;
+    // to deal with numerical error cases where the intersect plane go through one edge of the triangle. 
+    // if( (proja < 0 && projb < 0 && projc < 0) || (proja > 0 && projb > 0 && projc > 0) )
+    // {
+    //     for(int i =0; i < 3; ++i)
+    //     {
+    //         if(abs(pro_vals[i]) < numerical_threshold)
+    //         {
+    //             if(tri_isovals[i] >= iso_incre_val)
+    //             {
+    //                 iso_incre_val = tri_isovals[i];
+    //                 iso_incre_pt  = f_pts[i];
+    //                 intersect_edge.push_back(face[i]);
+    //             }
+    //             if(tri_isovals[i] <= iso_decre_val)
+    //             {
+    //                 iso_decre_val = tri_isovals[i];
+    //                 iso_decre_pt  = f_pts[i];
+    //                 intersect_edge.push_back(face[i]);
+    //             }
+    //         }
+    //     }
+    // } 
+    // std::cout << " proj vals : " << proja << " " << projb << " " << projc << std::endl;
+    // std::cout << " min max iso vals " << iso_decre_val << " " << iso_incre_val << std::endl; 
+    for(const auto& edge : cur_edges)
+    {
+        if(pro_vals[edge[0]] * pro_vals[edge[1]] <= 0)
+        {
+            has_intersect_res = true;
+            double t = std::abs(pro_vals[edge[0]]) /(std::abs(pro_vals[edge[0]]) + std::abs(pro_vals[edge[1]]));
+            arma::vec3 newPt = f_pts[edge[0]] + t * (f_pts[edge[1]] - f_pts[edge[0]]);
+            // std::cout << " inter pts : " << newPt[0] << " " << newPt[1] << " " << newPt[2] << std::endl;
+            double new_val = tri_isovals[edge[0]] + t * (tri_isovals[edge[1]] - tri_isovals[edge[0]]);
+            // std::cout << " iso vals " << new_val << std::endl;
+            if(new_val >= iso_incre_val)
+            {
+                iso_incre_val = new_val;
+                iso_incre_pt  = newPt;
+                incre_edge = {face[edge[0]], face[edge[1]]};
+            } 
+            if(new_val <= iso_decre_val)
+            {
+                iso_decre_val = new_val;
+                iso_decre_pt  = newPt;
+                decre_edge = {face[edge[0]], face[edge[1]]};
+            } 
+        }
+    }
+    return true;
+}
+std::string GenerateEdgeKey(const size_t e_a, const size_t e_b)
+{
+    if(e_a > e_b)
+    {
+        return std::to_string(e_b) + "_" + std::to_string(e_a);
+    }
+    return std::to_string(e_a) + "_" + std::to_string(e_b);
+}
+
+
+
+
+void SearchNextPt(const std::vector<std::array<double,3>>& mesh_points, 
+            const std::vector<std::vector<size_t>>& mesh_faces,
+            const std::vector<arma::vec3>& face_interPlane_normals,
+            const std::vector<arma::vec3>& face_gradients,
+            const std::vector<double> &pt_vals,
+            const std::vector<std::vector<size_t>>& pid_eids_map, 
+            const std::vector<std::array<size_t, 2>>& all_mesh_edges,
+            const std::vector<std::vector<size_t>>& edge_hash_face_id_map,
+            const std::vector<std::vector<size_t>>& pid_fid_map,
+            std::unordered_map<std::string, size_t>& edge_id_map,
+            std::unordered_map<std::string, int>& face_edge_signs,
+            std::unordered_map<std::string, int>& pt_face_grad_sign_map,
+            TriMeshSearchRes& pre_search_res,
+            bool search_iso_incre, 
+            TriMeshSearchRes& search_res)
+{
+    // auto edge_id = locateTriFaceEdge(mesh_points, all_mesh_edges, pt); 
+    // std::string e_key = GenerateEdgeKey(incre_edge[0], incre_edge[1]);
+    const arma::vec3& seed_pt = pre_search_res.next_pt;
+    size_t e_id = pre_search_res.edge_id;
+    size_t p_id = pre_search_res.p_id;
+    size_t e_n = all_mesh_edges.size();
+    size_t p_n = mesh_points.size();
+    size_t f_n = mesh_faces.size();
+    if(pre_search_res.pt_type == NextPtType::EdgePt)
+    {
+        bool has_valid_fid  = false;
+        size_t largest_f_id = f_n;
+        double largest_grad_mag = 0;
+       
+        const auto& next_fids =  edge_hash_face_id_map[e_id];
+        if(search_iso_incre)
+        {
+            for(auto f_id : next_fids)
+            {
+                std::string ef_key = std::to_string(e_id) + "_" + std::to_string(f_id);
+                if(face_edge_signs[ef_key] > 0)
+                {
+                    has_valid_fid = true;
+                    const auto& grad = face_gradients[f_id];
+                    double g_norm = arma::norm(grad);
+                    if(g_norm > largest_grad_mag)
+                    {
+                        largest_grad_mag = g_norm;
+                        largest_f_id = f_id;
+                    }
+                }
+            }
+            TriFaceIntersectRes intersect_res;
+            if(has_valid_fid)
+            {
+                const auto& max_face = mesh_faces[largest_f_id];
+                arma::vec3 tri_isovals = {pt_vals[max_face[0]], pt_vals[max_face[1]], pt_vals[max_face[2]]};
+                IntersectTriFace(mesh_points, face_interPlane_normals[largest_f_id], 
+                        max_face, seed_pt, tri_isovals, intersect_res);
+                if(intersect_res.has_intersect_res)
+                {
+                    const auto& incre_edge =  intersect_res.incre_edge;
+                    auto e_key = GenerateEdgeKey(incre_edge[0], incre_edge[1]);
+                    search_res.edge_id = edge_id_map[e_key];
+                    search_res.pt_type = NextPtType::EdgePt;
+                    search_res.next_pt = intersect_res.iso_incre_pt;
+                    search_res.iso_val = intersect_res.iso_incre_val;
+                    return;
+                }        
+                
+            } 
+            if( !has_valid_fid || !intersect_res.has_intersect_res) 
+            {
+                const auto& cur_edge =  all_mesh_edges[e_id];
+                size_t larger_val_pid = pt_vals[cur_edge[0]] > pt_vals[cur_edge[1]] ?
+                                        cur_edge[0] : cur_edge[1];
+                search_res.p_id = larger_val_pid;
+                search_res.pt_type = NextPtType::MeshPt;
+                const auto& cur_pt = mesh_points[larger_val_pid];
+                search_res.next_pt = {cur_pt[0], cur_pt[1], cur_pt[2]};
+                search_res.iso_val = pt_vals[larger_val_pid];
+                return;
+            }
+        }
+        else {
+            for(auto f_id : next_fids)
+            {
+                std::string ef_key = std::to_string(e_id) + "_" + std::to_string(f_id);
+                if(face_edge_signs[ef_key] < 0)
+                {
+                    has_valid_fid = true;
+                    const auto& grad = face_gradients[f_id];
+                    double g_norm = arma::norm(grad);
+                    if(g_norm > largest_grad_mag)
+                    {
+                        largest_grad_mag = g_norm;
+                        largest_f_id = f_id;
+                    }
+                }
+            }
+            TriFaceIntersectRes intersect_res;
+            if(has_valid_fid)
+            {
+                const auto& max_face = mesh_faces[largest_f_id];
+                arma::vec3 tri_isovals = {pt_vals[max_face[0]], pt_vals[max_face[1]], pt_vals[max_face[2]]};
+                
+                IntersectTriFace(mesh_points, face_interPlane_normals[largest_f_id], 
+                        max_face, seed_pt, tri_isovals, intersect_res);
+                if(intersect_res.has_intersect_res)
+                {
+                    const auto& decre_edge =  intersect_res.decre_edge;
+                    auto e_key = GenerateEdgeKey(decre_edge[0], decre_edge[1]);
+                    search_res.edge_id = edge_id_map[e_key];
+                    search_res.pt_type = NextPtType::EdgePt;
+                    search_res.next_pt = intersect_res.iso_decre_pt;
+                    search_res.iso_val = intersect_res.iso_decre_val;
+                    return;
+                }
+            }
+            if( !has_valid_fid || !intersect_res.has_intersect_res)  
+            {
+                if(edge_hash_face_id_map[e_id].size() < 2) return;
+                const auto& cur_edge =  all_mesh_edges[e_id];
+                size_t min_val_pid = pt_vals[cur_edge[0]] < pt_vals[cur_edge[1]] ?
+                                        cur_edge[0] : cur_edge[1];
+                search_res.p_id = min_val_pid;
+                search_res.pt_type = NextPtType::MeshPt;
+                const auto& cur_pt = mesh_points[min_val_pid];
+                search_res.next_pt = {cur_pt[0], cur_pt[1], cur_pt[2]};
+                search_res.iso_val = pt_vals[min_val_pid];
+                return;
+            }
+        }
+    } // end of valid eid 
+    bool has_valid_face_id = false;
+    TriFaceIntersectRes intersect_res;
+    if(pre_search_res.pt_type == NextPtType::MeshPt)
+    {
+        const auto& next_fids = pid_fid_map[p_id];
+        size_t largest_grad_fid;
+        double max_grad_len = 0;
+        for(auto f_id : next_fids)
+        {
+            std::string pf_key = std::to_string(p_id) + "_" + std::to_string(f_id);
+            if(pt_face_grad_sign_map[pf_key] > 0 && search_iso_incre)
+            {
+                double grad_len = arma::norm(face_gradients[f_id]);
+                if(grad_len > max_grad_len)
+                {
+                    max_grad_len = grad_len;
+                    has_valid_face_id = true;
+                    largest_grad_fid = f_id;
+                }
+            }
+            if(pt_face_grad_sign_map[pf_key] < 0 && !search_iso_incre)
+            {
+                double grad_len = arma::norm(face_gradients[f_id]);
+                if(grad_len > max_grad_len)
+                {
+                    max_grad_len = grad_len;
+                    has_valid_face_id = true;
+                    largest_grad_fid = f_id;
+                }
+            }
+        }
+        
+        if(has_valid_face_id)
+        {
+            const auto& max_face = mesh_faces[largest_grad_fid];
+            arma::vec3 tri_isovals = {pt_vals[max_face[0]], pt_vals[max_face[1]], pt_vals[max_face[2]]};
+            IntersectTriFace(mesh_points, face_interPlane_normals[largest_grad_fid], 
+                    max_face, seed_pt, tri_isovals, intersect_res);
+            if(intersect_res.has_intersect_res)
+            {
+                if(search_iso_incre)
+                {
+                    const auto& incre_edge =  intersect_res.incre_edge;
+                    auto e_key = GenerateEdgeKey(incre_edge[0], incre_edge[1]);
+                    search_res.edge_id = edge_id_map[e_key];
+                    search_res.pt_type = NextPtType::EdgePt;
+                    search_res.next_pt = intersect_res.iso_incre_pt;
+                    search_res.iso_val = intersect_res.iso_incre_val;
+                } else {
+                    const auto& decre_edge =  intersect_res.decre_edge;
+                    auto e_key = GenerateEdgeKey(decre_edge[0], decre_edge[1]);
+                    search_res.edge_id = edge_id_map[e_key];
+                    search_res.pt_type = NextPtType::EdgePt;
+                    search_res.next_pt = intersect_res.iso_decre_pt;
+                    search_res.iso_val = intersect_res.iso_decre_val;
+                }
+            } else {
+                // std::cout << " valid face has no intersection !" << std::endl;
+            }
+
+        }
+    }
+
+    if(pre_search_res.pt_type == NextPtType::MeshPt)
+    {
+        if( !has_valid_face_id || !intersect_res.has_intersect_res)
+        {
+            {
+                // std::cout << " mesh pt has no valid face for iso incre search !" << std::endl;
+                bool has_valid_max_grad_edge = false; 
+                bool has_valid_min_grad_edge = false;
+                double max_grad_len = 0;
+                double min_grad_len = 0;
+                size_t max_p_id;
+                size_t max_e_id;
+                size_t min_p_id;
+                size_t min_e_id;
+                
+                const auto& neig_eids = pid_eids_map[p_id];
+                // std::cout << " pt neighbor edge count " <<  neig_eids.size() << std::endl;
+                for(const auto e_id : neig_eids)
+                {
+                    const auto& cur_e = all_mesh_edges[e_id];
+                    size_t e_pid2 = cur_e[0] == p_id ? cur_e[1] : cur_e[0]; 
+                    arma::vec3 e_pa = {mesh_points[p_id][0],mesh_points[p_id][1],mesh_points[p_id][2]};
+                    arma::vec3 e_pb = {mesh_points[e_pid2][0],mesh_points[e_pid2][1],mesh_points[e_pid2][2]};
+                    double e_len = arma::norm(e_pb - e_pa);
+                    double iso_val_a = pt_vals[p_id];
+                    double iso_val_b = pt_vals[e_pid2];
+                    double cur_grad_len = (iso_val_b - iso_val_a) / e_len;
+                    if(cur_grad_len > max_grad_len)
+                    {
+                        has_valid_max_grad_edge = true;
+                        max_grad_len = cur_grad_len;
+                        max_p_id = e_pid2;
+                        max_e_id = e_id;
+                    } 
+                    if(cur_grad_len < min_grad_len)
+                    {
+                        has_valid_min_grad_edge = true;
+                        min_grad_len = cur_grad_len;
+                        min_p_id = e_pid2;
+                        min_e_id = e_id;
+                    }
+                }
+                if(search_iso_incre && has_valid_max_grad_edge)
+                {
+                    if(edge_hash_face_id_map[max_e_id].size() < 2) return;
+                    arma::vec3 next_pt = {mesh_points[max_p_id][0],mesh_points[max_p_id][1],mesh_points[max_p_id][2]}; 
+                    search_res.p_id = max_p_id;
+                    search_res.pt_type = NextPtType::MeshPt;
+                    search_res.next_pt = next_pt;
+                    search_res.iso_val = pt_vals[max_p_id];
+                }
+                if(!search_iso_incre && has_valid_min_grad_edge)
+                {
+                    if(edge_hash_face_id_map[min_e_id].size() < 2) return;
+                    arma::vec3 next_pt = {mesh_points[min_p_id][0],mesh_points[min_p_id][1],mesh_points[min_p_id][2]}; 
+                    search_res.p_id = min_p_id;
+                    search_res.pt_type = NextPtType::MeshPt;
+                    search_res.next_pt = next_pt;
+                    search_res.iso_val = pt_vals[min_p_id];
+                }
+            } 
+        }
+    }
+    
+}
+
+void IterativeSearch(const std::vector<std::array<double,3>>& mesh_points, 
+            const std::vector<std::vector<size_t>>& mesh_faces,
+            const std::vector<arma::vec3>& face_interPlane_normals,
+            const std::vector<arma::vec3>& face_gradients,
+            const std::vector<double> &pt_vals,
+            const std::vector<std::array<size_t, 2>>& all_mesh_edges,
+            const std::vector<std::vector<size_t>>& pid_eids_map, 
+            const std::vector<std::vector<size_t>>& pid_fids_map,
+            const std::vector<std::vector<size_t>>& edge_hash_face_id_map,
+            const std::vector<std::vector<size_t>>& pid_fid_map,
+            std::unordered_map<std::string, size_t>& edge_id_map,
+            std::unordered_map<std::string, int>& face_edge_signs,
+            std::unordered_map<std::string, int>& pt_face_grad_sign_map,
+            const arma::vec3& pt,
+            bool search_iso_incre,
+            double& consistence)
+{
+    
+    size_t p_count = 0;
+    // size_t cur_f_id =  f_id;
+    arma::vec3 seed_pt = pt; 
+    std::vector<double> inter_search_pts;
+    std::vector<arma::vec3> inter_incre_pts;
+    std::vector<arma::vec3> inter_decre_pts;
+    inter_incre_pts.push_back(pt);
+    inter_decre_pts.push_back(pt);
+    
+    double max_iso_val = 0.05;
+    double min_iso_val = -max_iso_val;
+    // arma::vec3 gradient;
+    // VIPSSRidges::g_hrfb_ptr->evaluate_gradient(pt[0], pt[1], pt[2], gradient[0], gradient[1], gradient[2]);
+    // const auto& tri_face = mesh_faces[cur_f_id];
+    // const auto& pa = mesh_points[tri_face[0]];
+    // const auto& pb = mesh_points[tri_face[1]];
+    // const auto& pc = mesh_points[tri_face[2]];
+    // arma::vec3 v_ab = {pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]};
+    // arma::vec3 v_ac = {pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2]};
+    // arma::vec3 f_normal = arma::cross(v_ab, v_ac);
+    // arma::vec3 inter_plane_normal = arma::cross(f_normal, gradient);
+    // std::unordered_set<size_t> visited_f_ids;
+    // std::cout << " start f id " << cur_f_id << std::endl;
+    // visited_f_ids.insert(cur_f_id);
+    double cur_iso_val= 0;
+    size_t cur_eid = locateTriFaceEdge(mesh_points, all_mesh_edges,pt_vals, seed_pt, cur_iso_val);
+    // std::cout << " --------- cur e id " << cur_eid << "  ;all_mesh_edges size : " << all_mesh_edges.size() << std::endl;
+    
+    TriMeshSearchRes pre_search_res;
+    pre_search_res.pt_type = NextPtType::EdgePt;
+    pre_search_res.edge_id = cur_eid;
+    pre_search_res.next_pt = seed_pt;
+    pre_search_res.iso_val = cur_iso_val;
+    VIPSSRidges::search_pts_all.push_back(seed_pt);
+    VIPSSRidges::search_pts_iso_vals.push_back(cur_iso_val);
+
+    while(p_count < 1000)
+    {
+        // std::cout << " loop id " << p_count << std::endl;
+        TriMeshSearchRes search_res;
+        SearchNextPt(mesh_points,mesh_faces,face_interPlane_normals, face_gradients,
+            pt_vals, pid_eids_map, all_mesh_edges,edge_hash_face_id_map,
+            pid_fids_map,  edge_id_map, face_edge_signs, pt_face_grad_sign_map,
+            pre_search_res, search_iso_incre, search_res);
+        // std::cout << " ------- next pt : " << search_res.next_pt << std::endl;
+        if(search_res.pt_type == NextPtType::None) break;
+
+        VIPSSRidges::search_pts_all.push_back(search_res.next_pt);
+        VIPSSRidges::search_pts_iso_vals.push_back(search_res.iso_val);
+        if(search_iso_incre)
+        {
+            if(search_res.iso_val > pre_search_res.iso_val)
+            {
+                consistence = search_res.iso_val;
+                if(consistence > max_iso_val) 
+                {
+                    consistence = max_iso_val;
+                    break;
+                }
+            } else {
+                break;
+            }
+
+        } else {
+            if(search_res.iso_val < pre_search_res.iso_val )
+            {
+                consistence = search_res.iso_val;
+                if(consistence < min_iso_val) 
+                {
+                    consistence = min_iso_val;
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        
+        // std::cout << " ------- next pt : " << search_res.next_pt << std::endl;
+        pre_search_res = search_res;
+        
+        // std::cout << " ------- next pt : " << pre_search_res.next_pt << std::endl;
+        p_count ++;
+    }
+
+
+    // while(p_count < 100)
+    // {
+    //     const auto& cur_f = mesh_faces[cur_f_id];
+    //     // const arma::vec3& inter_plane_normal = face_interPlane_normals[cur_f_id];
+    //     arma::vec3 tri_isovals = {pt_vals[cur_f[0]], pt_vals[cur_f[1]], pt_vals[cur_f[2]]};
+    //     arma::vec3 iso_incre_pt;
+    //     arma::vec3 iso_decre_pt;
+    //     double iso_incre_val; 
+    //     double iso_decre_val;
+    //     std::array<size_t,2> incre_edge;
+    //     std::array<size_t,2> decre_edge;
+    //     IntersectTriFace(mesh_points, inter_plane_normal, 
+    //             cur_f, seed_pt, tri_isovals,
+    //             iso_incre_pt, iso_incre_val, incre_edge, 
+    //             iso_decre_pt, iso_decre_val, decre_edge);
+    //     if(search_iso_incre)
+    //     {
+    //         // inter_incre_pts.push_back(iso_incre_pt);
+    //         VIPSSRidges::search_pts_all.push_back(iso_incre_pt);
+    //         VIPSSRidges::search_pts_iso_vals.push_back(iso_incre_val);
+    //         // consistence = iso_incre_val < max_iso_val ? iso_incre_val : max_iso_val;
+    //         consistence = iso_incre_val;
+    //         if(iso_incre_val >= max_iso_val) break;
+    //         std::string e_key = GenerateEdgeKey(incre_edge[0], incre_edge[1]);
+    //         size_t next_cre_edge_id = edge_id_map[e_key];
+    //         const auto& next_fids =  edge_hash_face_id_map[next_cre_edge_id]; 
+    //         seed_pt = iso_incre_pt;
+    //         std::cout << " incre next fids " << next_fids[0] << " " << next_fids[1] << std::endl;
+    //         if(next_fids.size() < 2) break;
+    //         cur_f_id = next_fids[0] == cur_f_id ? next_fids[1] : next_fids[0];
+    //         if(visited_f_ids.find(cur_f_id) == visited_f_ids.end())
+    //         {
+    //             visited_f_ids.insert(cur_f_id);
+    //         } else {
+    //             std::cout << "face id has already been visited " << std::endl;
+    //             break;
+    //         }
+    //         std::string f_e_key = std::to_string(next_cre_edge_id) + "_" + std::to_string(cur_f_id);
+    //         if(face_edge_signs[f_e_key] < 0) break;
+    //     } else {
+    //         // inter_decre_pts.push_back(iso_decre_pt);
+    //         VIPSSRidges::search_pts_all.push_back(iso_decre_pt);
+    //         VIPSSRidges::search_pts_iso_vals.push_back(iso_decre_val);
+    //         consistence = iso_decre_val;
+    //         if(iso_decre_val <= min_iso_val) break;
+    //         std::string e_key = GenerateEdgeKey(decre_edge[0], decre_edge[1]);
+    //         size_t next_cre_edge_id = edge_id_map[e_key];
+    //         const auto& next_fids = edge_hash_face_id_map[next_cre_edge_id]; 
+    //         if(next_fids.size() < 2) break;
+    //         seed_pt = iso_decre_pt;
+    //         cur_f_id = next_fids[0] == cur_f_id ? next_fids[1] : next_fids[0];
+    //         std::string f_e_key = std::to_string(next_cre_edge_id) + "_" + std::to_string(cur_f_id);
+    //         if(visited_f_ids.find(cur_f_id) == visited_f_ids.end())
+    //         {
+    //             visited_f_ids.insert(cur_f_id);
+    //         } else {
+    //             std::cout << "face id has already been visited " << std::endl;
+    //             break;
+    //         }
+    //         if(face_edge_signs[f_e_key] > 0) break;
+
+    //     }
+    //     p_count++;
+    // }  
+    // consistence = consistence < max_iso_val ? consistence : max_iso_val;
+    // consistence = consistence > min_iso_val ? consistence : min_iso_val;
+
+
+    
+    // if(search_iso_incre) 
+    // {
+    //     writeXYZ("search_incre_pts_test.xyz", inter_incre_pts);
+    // } else {
+    //     writeXYZ("search_decre_pts_test.xyz", inter_decre_pts);
+    // }
+    
+}
+
+void CalPtFaceGradSign(const std::vector<std::array<double,3>>& mesh_points, 
+                const std::vector<std::vector<size_t>>& mesh_faces,
+                const std::vector<arma::vec3>& face_gradients,
+                const std::vector<arma::vec3>& face_centers,
+                std::unordered_map<std::string, int> & pt_face_grad_sign_map)
+{
+    size_t f_n = mesh_faces.size();
+    
+    std::array<std::array<size_t,2>, 3> face_neighbors = {{{1,2}, {0,2}, {0,1}}};
+    for(size_t i = 0; i < f_n; ++i)
+    {
+        const auto& face = mesh_faces[i];
+        const auto& grad = face_gradients[i];
+        const auto& center = face_centers[i];
+        std::array<arma::vec3,3> f_pts;
+        f_pts[0] = {mesh_points[face[0]][0], mesh_points[face[0]][1],mesh_points[face[0]][2]};
+        f_pts[1] = {mesh_points[face[1]][0], mesh_points[face[1]][1],mesh_points[face[1]][2]};
+        f_pts[2] = {mesh_points[face[2]][0], mesh_points[face[2]][1],mesh_points[face[2]][2]};
+        
+        for(int j = 0; j < 3; ++j)
+        {
+            size_t pid = face[j];
+            const auto& cur_pt = f_pts[j];
+            const auto& neig = face_neighbors[j];
+            arma::vec3 d1 = f_pts[neig[0]] - cur_pt;
+            arma::vec3 d2 = f_pts[neig[1]] - cur_pt;
+            std::string key = std::to_string(pid) + "-" + std::to_string(i);
+            pt_face_grad_sign_map[key] = 0;
+            arma::vec3 sign1 = arma::cross(grad, d1); 
+            arma::vec3 sign2 = arma::cross(grad, d2); 
+            if(arma::dot(sign1, sign2) <= 0)
+            {
+                arma::vec3 dcenter = center - cur_pt;
+                if(arma::dot(dcenter, grad) >= 0)
+                {
+                    pt_face_grad_sign_map[key] = 1;
+                } else {
+                    pt_face_grad_sign_map[key] = -1;
+                }
+            }
+        }
+    }
+}
+
+void CalEdgeFaceGradSign(const std::vector<std::array<double,3>>& mesh_points, 
+                const std::vector<std::vector<size_t>>& mesh_faces,
+                const std::vector<arma::vec3>& face_normals,
+                std::vector<arma::vec3>& face_gradient,
+                const std::vector<arma::vec3>& face_centers,
+                std::unordered_map<std::string, size_t>& edge_id_map,
+                std::unordered_map<std::string, int>& face_edge_signs,
+                std::vector<std::vector<size_t>>& edge_hash_face_id_map)
+{
+    size_t f_n = mesh_faces.size();
+    for(size_t i = 0; i < f_n; ++i)
+    {
+        const auto& f = mesh_faces[i];
+        std::array<std::array<size_t,2>,3> f_edges = {{{f[0], f[1]}, {f[1],f[2]}, {f[2], f[0]}}};
+        const auto& gradient = face_gradient[i];
+        const auto& f_normal = face_normals[i];
+        const auto& f_center = face_centers[i];
+        for(const auto& edge : f_edges)
+        {
+            const auto& pa = mesh_points[edge[0]];
+            const auto& pb = mesh_points[edge[1]];
+            arma::vec3 v_ab = {pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]};
+            arma::vec3 e_vertical_dir = arma::cross(f_normal, v_ab);
+            arma::vec3 mid_ab = {(pa[0] + pb[0])/2.0,(pa[1] + pb[1])/2.0,(pa[2] + pb[2])/2.0}; 
+            arma::vec3 inward_dir = f_center - mid_ab;
+            if(arma::dot(inward_dir,e_vertical_dir) < 0)
+            {
+                e_vertical_dir *= -1.0;
+            }
+            std::string e_key = GenerateEdgeKey(edge[0], edge[1]);
+            size_t e_id = edge_id_map[e_key];
+            edge_hash_face_id_map[e_id].push_back(i);
+            std::string f_e_key = std::to_string(e_id) + "_" + std::to_string(i); 
+            if(arma::dot(e_vertical_dir, gradient) <= 0)
+            {
+                face_edge_signs[f_e_key] = -1;
+            } else {
+                face_edge_signs[f_e_key] = 1;
+            }
+        }
+    }
+}
+
+void VIPSSRidges::CalCurvesPtsConsistence(const std::vector<std::array<double,3>>& mesh_points, 
+                const std::vector<std::vector<size_t>>& mesh_faces, 
+                const std::vector<double> &pt_vals,
+                const std::string& curve_key,
+                const std::string& curve_path, 
+                const double max_iso_val)
+{
+    size_t f_n = mesh_faces.size();
+    size_t p_n = mesh_points.size();
+    // std::vector<arma::vec3> mesh_pts_new(p_n);
+    // for(size_t i = 0; i < p_n; ++i)
+    // {
+    //     mesh_pts_new[i] = {mesh_points[i][0], mesh_points[i][1], mesh_points[i][2]};
+    // }
+    std::vector<arma::vec3> face_gradients(f_n);  
+    std::vector<arma::vec3> face_normals(f_n);  
+    std::vector<arma::vec3> face_interPlane_normals(f_n);
+    std::vector<std::array<size_t,2>> all_mesh_edges;
+    std::vector<arma::vec3> edge_gradients;
+    std::unordered_map<std::string, size_t> edge_id_map;
+    std::vector<arma::vec3> face_centers(f_n);
+    std::vector<std::vector<size_t> > pid_fid_map(p_n);
+    std::vector<std::vector<size_t> > pid_eid_map(p_n);
+
+    for(size_t i = 0; i < f_n; ++i)
+    {
+        const auto& f = mesh_faces[i];
+        for(auto p_id : f)
+        {
+            pid_fid_map[p_id].push_back(i);
+        }
+        const auto& pa = mesh_points[f[0]];
+        const auto& pb = mesh_points[f[1]];
+        const auto& pc = mesh_points[f[2]];
+        std::array<std::array<size_t, 2>,3> face_edges = 
+                {{{f[0], f[1]}, {f[1], f[2]}, {f[2], f[0]}}};  
+        // auto key_ab = GenerateEdgeKey(f[0], f[1]);
+        // auto key_bc = GenerateEdgeKey(f[1], f[2]);
+        // auto key_ca = GenerateEdgeKey(f[2], f[0]);
+        // std::vector<std::string> f_keys = {key_ab, key_bc, key_ca};
+        for(const auto& cur_edge : face_edges)
+        {
+            auto edge_key = GenerateEdgeKey(cur_edge[0], cur_edge[1]);
+            if(edge_id_map.find(edge_key) == edge_id_map.end())
+            {
+                size_t ele_n = edge_id_map.size();
+                edge_id_map[edge_key] = ele_n;
+                all_mesh_edges.push_back(cur_edge);
+                const auto& e_pa = mesh_points[cur_edge[0]];
+                const auto& e_pb = mesh_points[cur_edge[1]];
+                arma::vec3 d_ab  = {e_pb[0] - e_pa[0], e_pb[1] - e_pa[1], e_pb[2] - e_pa[2] };
+                double d_iso = pt_vals[cur_edge[1]] - pt_vals[cur_edge[0]];
+                arma::vec3 e_grad = arma::normalise(d_ab) * d_iso;
+            }
+        }
+
+        face_centers[i] = {(pa[0] + pb[0] + pc[0])/3.0, 
+                           (pa[1] + pb[1] + pc[1])/3.0,
+                           (pa[2] + pb[2] + pc[2])/3.0};
+
+        arma::vec3 v_ab =  {pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]};
+        arma::vec3 v_ac =  {pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2]};
+        arma::vec3 v_bc =  {pc[0] - pb[0], pc[1] - pb[1], pc[2] - pb[2]};
+        // [v1, v2, v3] [v1T, v2T] [k1, k2] = B
+        // arma::mat33 Amat = { {v_ab[0], v_ab[1], v_ab[2]},
+        //                      {v_ac[0], v_ac[1], v_ac[2]},
+        //                      {v_bc[0], v_bc[1], v_bc[2]}};
+        arma::mat Amat = { {arma::dot(v_ab, v_ab), arma::dot(v_ab, v_ac)},
+                             {arma::dot(v_ac, v_ab), arma::dot(v_ac, v_ac)},
+                             {arma::dot(v_bc, v_ab), arma::dot(v_bc, v_ac)}};
+
+        arma::vec3 Bvec = {pt_vals[f[1]] - pt_vals[f[0]], 
+                           pt_vals[f[2]] - pt_vals[f[0]],
+                           pt_vals[f[2]] - pt_vals[f[1]]};
+        arma::vec2 k1k2 = arma::solve(Amat, Bvec, arma::solve_opts::fast);
+        face_gradients[i] = arma::normalise( k1k2[0] * v_ab + k1k2[1] * v_ac);
+        arma::vec3 normal = arma::cross(v_ab, v_ac);
+        face_normals[i] = arma::normalise(normal);
+        face_interPlane_normals[i] = arma::normalise(arma::cross(face_gradients[i], face_normals[i]));
+    }
+    writeXYZnormal("ridge_mesh_tri_gradients.xyz", face_centers, face_gradients);
+    writeXYZnormal("ridge_mesh_tri_face_normal.xyz", face_centers, face_normals);
+    writeXYZnormal("ridge_mesh_tri_plane_normal.xyz", face_centers, face_interPlane_normals); 
+
+    for(size_t eid = 0; eid < all_mesh_edges.size(); ++eid)
+    {
+        const auto& cur_edge = all_mesh_edges[eid];
+        pid_eid_map[cur_edge[0]].push_back(eid);
+        pid_eid_map[cur_edge[1]].push_back(eid);
+    }
+
+    unordered_map<string, int> pt_face_grad_sign_map;
+    CalPtFaceGradSign(mesh_points,mesh_faces,face_gradients,face_centers,pt_face_grad_sign_map);
+
+    std::unordered_map<std::string, int> face_edge_signs;
+    std::vector<std::vector<size_t>> edge_hash_face_id_map(edge_id_map.size()); 
+    CalEdgeFaceGradSign(mesh_points,mesh_faces,face_normals, face_gradients,
+            face_centers, edge_id_map, face_edge_signs,edge_hash_face_id_map);
+    
+    
+    const auto& curve_pts = curves_pts_map[curve_key];
+    const auto& curve_edges = curves_edges_map[curve_key];
+    std::vector<double> cuv_pt_consistence(curve_pts.size(), 0);
+    // double max_iso_val = 0.1;
+    double min_iso_val = -max_iso_val;
+    for(int i = 0; i < curve_pts.size(); ++i)
+    {
+        
+        arma::vec3 seed_pt = {curve_pts[i][0], curve_pts[i][1], curve_pts[i][2]};
+        // seed_pt = {-0.006917, 0.205088, 1.044140};
+        // arma::vec3 bad_pt = {-0.533471, 0.346235, 0.983294};
+        // arma::vec3 bad_pt = {-0.006917, 0.205088, 1.044140};
+        // arma::vec3 bad_pt = {0.055146, 0.209869, 0.986487};
+        // arma::vec3 bad_pt = {-0.363964, 0.243685, 1.17535 };
+        // seed_pt = {-0.435075, 0.278983, 1.11872 };
+        // seed_pt =  {-0.533471, 0.346235, 0.983294};
+        // if(arma::norm(bad_pt - seed_pt) > 1e-5) continue;
+        // size_t f_id = locateTriFace(mesh_points, mesh_faces, seed_pt);
+        // // std::cout << "f id " << f_id << "  mesh face size : " << mesh_faces.size() << std::endl;
+        // if(f_id >= mesh_faces.size()) continue;
+        // const auto& f = mesh_faces[f_id];
+        // if(i != 27 ) continue;
+        
+        // std::cout << " curve_pts size : " << curve_pts.size() << "  ; v id : " <<  i << std::endl; 
+        // std::vector<double> test_pts;
+        // test_pts.push_back(seed_pt[0]);test_pts.push_back(seed_pt[1]);test_pts.push_back(seed_pt[2]);
+        // for(int k = 0; k < 3; ++k)
+        // {
+        //     test_pts.push_back(mesh_points[f[k]][0]);
+        //     test_pts.push_back(mesh_points[f[k]][1]);
+        //     test_pts.push_back(mesh_points[f[k]][2]);
+        // }
+        // writeXYZ("test_pts.xyz", test_pts);
+        // if(f_id < f_n)
+        {
+            bool search_iso_incre = true;
+            double max_consistence = 0;
+
+            IterativeSearch( mesh_points, mesh_faces, face_interPlane_normals,
+            face_gradients, pt_vals, all_mesh_edges, pid_eid_map, 
+            pid_fid_map,edge_hash_face_id_map, pid_fid_map, edge_id_map,
+            face_edge_signs, pt_face_grad_sign_map, seed_pt, search_iso_incre, max_consistence);
+            
+            search_iso_incre = false;
+            double min_consistence = 0;
+            IterativeSearch( mesh_points, mesh_faces, face_interPlane_normals,
+            face_gradients, pt_vals, all_mesh_edges, pid_eid_map, 
+            pid_fid_map,edge_hash_face_id_map, pid_fid_map, edge_id_map,
+            face_edge_signs, pt_face_grad_sign_map, seed_pt, search_iso_incre, min_consistence);
+
+            // std::cout << " max val : " << max_consistence << " , min val : " << min_consistence << std::endl;
+            cuv_pt_consistence[i] = max_consistence + abs(min_consistence);
+            
+        }
+        // break;
+    }
+    SavePointsWithQualityToPLY(curve_path, curve_pts, cuv_pt_consistence);
+}
 
 
 bool VIPSSRidges::CalculateEdgeCreasePoints()

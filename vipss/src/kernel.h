@@ -32,6 +32,8 @@ void XCube_Hessian_Kernel_2p(const double *p1, const double *p2, double *H);
 
 void XCube_HessianDot_Kernel_2p(const double *p1, const double *p2, const double *p3, std::vector<double>&dotout);
 
+
+
 arma::mat BuildHrbfMat(std::vector<double>&pts);
 
 arma::mat BuildHrbfMat(const std::vector<tetgenmesh::point>&pts, const std::vector<int>&pids,  bool use_rbf_base = false);

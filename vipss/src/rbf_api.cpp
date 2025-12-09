@@ -12,7 +12,7 @@ void RBF_API::Set_RBF_PARA(){
     // std::cout << " Start to set rbf para ..... " << endl;
     RBF_Paras &para= para_;
     RBF_InitMethod initmethod = Lamnbda_Search;
-    RBF_Kernal Kernal = XCube;
+    RBF_Kernal Kernal = FifthPower;
     int polyDeg = 1;
     double sigma = 0.9;
     double rangevalue = 0.001;
@@ -269,6 +269,7 @@ void RBF_API::build_cluster_hrbf(std::vector<double> &Vs, std::vector<double> &V
     rbf_ptr->key_npt = Vn.size()/3;
     rbf_ptr->npt = Vs.size()/3;
     rbf_ptr->InjectData(Vs, para_);
+
     rbf_ptr->Set_HermiteRBF(Vs);
 
     // printf(" start to Solve_RBFCoefWithOptNormalAndSval\n");
@@ -436,8 +437,10 @@ void BuildGlobalHRBFVipss(std::vector<double> &Vs, std::shared_ptr<RBF_Core> rfb
     // para_.user_lamnbda = lambda;
     // RBF_Core rbf_core_;
     // std::cout << " input key pt size  00 "  << std::endl;
+    // rfb_ptr->Init(RBF_Kernal::FifthPower);
     rfb_ptr->key_npt = Vs.size()/3;
     std::cout << " input key pt size " << rfb_ptr->key_npt  << std::endl;
+    RBF_API::para_.Kernal = RBF_Kernal::XCube;
     rfb_ptr->InjectData(Vs, RBF_API::para_);
     // rfb_ptr->User_Lamnbda = lambda;
     rfb_ptr->BuildK(lambda);
@@ -450,18 +453,23 @@ void BuildGlobalHRBFVipss(std::vector<double> &Vs, std::shared_ptr<RBF_Core> rfb
     double pre_time = (std::chrono::nanoseconds(t1 - t0).count()/1e9);
 }
 
-void BuildGlobalHRBFVipssWithNormals(std::vector<double> &Vs, std::vector<double> &Vn,
-    std::shared_ptr<RBF_Core> rfb_ptr, double lambda)
+void BuildGlobalHRBFVipssWithNormals(std::vector<double> &Vs, std::vector<double> &Vn, std::vector<double> s_vals,
+    std::shared_ptr<RBF_Core> rfb_ptr, double lambda, RBF_Kernal kenel_type = RBF_Kernal::FifthPower)
 {
     auto t0 = Clock::now();
     rfb_ptr->key_npt = Vs.size()/3;
+    // rfb_ptr->Init(RBF_Kernal::FifthPower);
+    RBF_API::para_.Kernal = kenel_type;
     std::cout << " input key pt size " << rfb_ptr->key_npt  << std::endl;
     rfb_ptr->InjectData(Vs, RBF_API::para_);
-    rfb_ptr->BuildK(lambda);
+    // rfb_ptr->BuildK(lambda);
+    rfb_ptr->Set_HermiteRBF(Vs);
     std::cout << " finish build k " << std::endl;
     double build_time = (std::chrono::nanoseconds(Clock::now() - t0).count()/1e9);
-    std::vector<double> s_vals(Vs.size()/3, 0);
-    rfb_ptr->Set_RBFCoefWithOptNormalAndSval(Vn, s_vals);
+    // std::vector<double> s_vals(Vs.size()/3, 0);
+    bool flip = false;
+
+    rfb_ptr->Solve_RBFCoefWithOptNormalAndSval(Vn, s_vals, flip);
     // rfb_ptr->InitNormal();
     // std::cout << " finish InitNormal " << std::endl;
     // rfb_ptr->OptNormal(0);

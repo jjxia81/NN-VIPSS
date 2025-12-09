@@ -26,6 +26,35 @@ struct PEdge{
         };
     };
 
+struct TriFaceIntersectRes{
+    bool has_intersect_res = false;
+    arma::vec3 iso_incre_pt;
+    arma::vec3 iso_decre_pt;
+    double iso_incre_val; 
+    double iso_decre_val;
+    std::array<size_t,2> incre_edge;
+    std::array<size_t,2> decre_edge;
+};
+
+enum NextPtType {
+    MeshPt,
+    EdgePt,
+    None
+};
+
+// enum SearchStopType {
+//     Boundary,
+//     Large
+// }
+
+struct TriMeshSearchRes{
+    arma::vec3 next_pt;
+    size_t edge_id;
+    size_t p_id;
+    NextPtType pt_type = NextPtType::None;
+    double iso_val;
+};
+
 struct PrincipleCurvature{
         double k1_, k2_ = 0;
         double kmax_, kmin_ = 0;
@@ -106,9 +135,9 @@ class VIPSSRidges{
     void SaveRidgesWithQualityToPLY(const std::string& filename, const std::vector<double>& qualtity); 
     void SaveRidgesWithColorToPLY(const std::string& filename);
     static void SaveRidgesWithColorToPLY(const std::string& filename,
-    const std::vector<Point>& pts, 
-    const std::vector<std::vector<size_t>>& edges, 
-    const std::array<double, 3>& edge_color);
+                                        const std::vector<Point>& pts, 
+                                        const std::vector<std::vector<size_t>>& edges, 
+                                        const std::array<double, 3>& edge_color);
     void SetDataCenterAndScale(const Point& center, const double scale); 
     // Point IterpolateEdgesPt(const Point& pa, const Point& pb, double va, double vb, double inter_val = 0);
     void BuildPtAdjInfo();
@@ -195,11 +224,19 @@ class VIPSSRidges{
 
     void ProjectMeshPtsToSurface(std::vector<Point>& mesh_points, std::shared_ptr<RBF_Core> hrfb_ptr);
 
-    static void ExtractLevelSetCurvesOnMesh(const std::vector<Point>& mesh_points, 
+    static void ExtractLevelSetCurvesOnMesh(
+                const std::vector<Point>& mesh_points, 
                 const std::vector<std::vector<size_t>>& mesh_faces, 
                 const std::vector<double> &pt_vals,
                 const string& curve_path, const double level_val, 
                 const std::array<double,3> color);
+
+    static void CalCurvesPtsConsistence(const std::vector<std::array<double,3>>& mesh_points, 
+                const std::vector<std::vector<size_t>>& mesh_faces, 
+                const std::vector<double> &pt_vals,
+                const std::string& curve_key,
+                const std::string& curve_path, 
+                const double max_iso_val);
 
 
     public:
@@ -267,6 +304,11 @@ class VIPSSRidges{
     double user_lambda_ = 0.0;
     static std::vector<std::string> edge_curv_values_string; 
     static std::vector<std::vector<PrincipleCurvature>> edge_sample_curv_dataset; 
+    static std::unordered_map<std::string, std::vector<Point>> curves_pts_map;
+    static std::unordered_map<std::string, std::vector<std::vector<size_t>>> curves_edges_map;
+    // static std::unordered_map<std::string, size_t> edge_id_map;
+    static std::vector<arma::vec3> search_pts_all;
+    static std::vector<double> search_pts_iso_vals;
 
 };
 

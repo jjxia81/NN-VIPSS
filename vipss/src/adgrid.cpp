@@ -258,15 +258,16 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     // mtet::MTetMesh grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
     size_t volume_dim = 4;
     std::array<size_t, 3> new_resolution = {volume_dim, volume_dim, volume_dim};
-
+    // std::array<size_t, 3> new_resolution = {52, 52, 52};
     //Mesh Bounding Box min -1.291880 -0.607902 0.410953
     //Mesh Bounding Box max 0.772905 1.236420 1.989450
     //Mesh Bounding Box min -0.762772 -0.220353 0.525951
     //Mesh Bounding Box max 0.488482 0.977300 1.989450
-
     // expand_bbox_min = { -0.762772, -0.220353, 0.525951};
     // expand_bbox_max = { 0.488482,  0.977300,  1.989450};
 
+    expand_bbox_min = { -4.3, -4.3, -1.5};
+    expand_bbox_max = { 4.3,  4.3,  1.5};
     mtet::MTetMesh grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
 
 
@@ -282,7 +283,6 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     double threshold = args.threshold;
     int mode = IA;
     llvm_vecsmall::SmallVector<csg_unit, 20> csg_tree = {};
-    
     // /// Read implicit function
     // std::vector<std::unique_ptr<ImplicitFunction<double>>> functions;
     // load_functions(function_file, functions);
@@ -304,15 +304,17 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
         return vertex_eval;
     };
 
-
     auto implicit_func_ridge = [&](std::span<const Scalar, 3> data, size_t funcNum){
         llvm_vecsmall::SmallVector<CurvatureData<double>, 20> vertex_eval(funcNum);
         for(size_t funcIter = 0; funcIter < funcNum; funcIter++){
             std::shared_ptr<Hermite_RBF<double>> func = std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[funcIter]);
+            // std::shared_ptr<ImplicitFunctionRidge<double>> func = std::dynamic_pointer_cast<ImplicitFunctionRidge<double>>(functions[funcIter]);
             // Vec7D eval;
             // eval[0] = (static_cast<std::shared_ptr<Hermite_RBF<double>>>(func))->evaluate_gradient(data[0], data[1], data[2], eval[1], eval[2], eval[3]);
             CurvatureData<double> curv_data;
             // std::cout << " start  EvaluateCurvatureData ...... " << std::endl;
+            // std::cout << " data : " << data[0] << " " << data[1] << " " << data[2] << std::endl;
+            // std::cout << " control points size " << func->control_points_.size() << std::endl;;
             func->EvaluateCurvatureData(data[0], data[1], data[2], curv_data);
             // std::cout << " finish  EvaluateCurvatureData ...... " << std::endl;
             // eval << curv_data.e2_, curv_data.t2_, curv_data.e2_d2_;
@@ -322,7 +324,17 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
         return vertex_eval;
     };
     
-    ///
+    // std::shared_ptr<Hermite_RBF<double>> funcTemp = 
+    // std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[0]);
+    // double gx, gy, gz;
+    // funcTemp->evaluate_gradient(0.0010000, 0.583785, -0.313607, gx, gy, gz );
+    // std::cout << " test pt gradient : " << std::endl;
+    // std::cout << gx << " " << gy<< " " << gz<< std::endl;
+    // Hermite_RBF<double>::Mat33 hessian;
+    // funcTemp->EvaluateHessian(0.0010000, 0.583785, -0.313607,  hessian);
+    // std::cout << " test hessian mat : " << std::endl;
+    // std::cout << hessian << std::endl;
+
     /// the lambda function for csg tree iteration/evaluation.
     /// @param[in] funcInt          Given an input of value range std::array<double, 2> for an arbitrary number of functions
     /// @return   A value range of this CSG operation in a form of `std::array<double, 2>` and a list of active function in a form of    `llvm_vecsmall::SmallVector<int, 20>>`
@@ -336,9 +348,7 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
             return iterTree(csg_tree, 1, funcInt);
         }
     };
-
     printf("start gridRefineRidges ...... \n");
-    
     //perform main grid refinement algorithm:
     tet_metric metric_list;
     //an array of 10 timings: {total time getting the multiple indices, total time,time spent on single function, time spent on double functions, time spent on triple functions time spent on double functions' zero crossing test, time spent on three functions' zero crossing test, total subdivision time, total evaluation time,total splitting time}
@@ -362,7 +372,6 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     std::chrono::duration<double, std::milli> elapsed = time_end - time_start;
     std::cout << "-------------- adgrid Elapsed time: " << elapsed.count() << " ms\n";
 
-    
     // save timing records
     save_timings("timings.json",time_label, profileTimer);
     //profiled time(see details in time.h) and profiled number of calls to zero
@@ -388,37 +397,29 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     // std::cout << " val size " <<  values.size() << std::endl;
     // std::cout << " gradients size " <<  gradients.size() << std::endl;
     // std::cout << " vertices size " <<  vertices.size() << std::endl;
-
     // volume_dim = 32;
     // new_resolution = {volume_dim, volume_dim, volume_dim};
     // grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
-
-
     vector<array<double, 3>> vertices;
     vector<array<size_t, 4>> tets;
     get_mesh_data(grid_mesh, vertices, tets);
-
     std::cout << "vertices size " << vertices.size() << std::endl;
     std::cout << "tets size " << tets.size() << std::endl;
     vector<double> values(vertices.size());
-
     vector<double> e1_values(vertices.size());
     vector<double> e2_values(vertices.size());
     vector<double> k1_values(vertices.size());
     vector<double> k2_values(vertices.size());
     std::vector<PrincipleCurvature> tet_curvatures; 
     vector<std::array<double, 3>> gradients(vertices.size());
-    
+    vector<std::array<double, 3>> t1_vectors(vertices.size());
     int counter = 0;
-   
     constexpr std::array<std::array<size_t, 2>, 6> tet_edges3D = {
         {
             {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}}
         }
     };
-    std::shared_ptr<Hermite_RBF<double>> rbf_func = std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[0]);
-
-
+    // std::shared_ptr<Hermite_RBF<double>> rbf_func = std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[0]);
 
 if(crest_type != -1)
 { 
@@ -460,6 +461,15 @@ if(crest_type != -1)
     vector<CurvatureData<double>> tet_pt_curvature_data;
     get_function_curvature_data(grid_mesh, metric_list.vertex_func_grad_map_ridge, tet_pt_curvature_data);
 
+    // auto gaussian_func = std::dynamic_pointer_cast<ImplicitFunctionRidge<double>>(functions[0]);
+
+    // for(auto pt : gaussian_func->control_points_)
+    // {
+    //     CurvatureData<double> curv_data;
+    //     gaussian_func->EvaluateCurvatureData(pt[0], pt[1], pt[2], curv_data);
+    //     std::cout << " input pt val : " <<  curv_data.f_val_ << std::endl;
+    // }
+    
     std::cout << " finish get  get_function_curvature_data " << tet_pt_curvature_data.size() << std::endl;
     grid_mesh.seq_foreach_vertex([&](VertexId vid, std::span<const Scalar, 3> data){
         // llvm_vecsmall::SmallVector<std::array<double, 4>, 20> func_gradList(1);
@@ -467,13 +477,16 @@ if(crest_type != -1)
             // size_t id = value_of(vid); 
             // std::cout << " id 000 " << id << std::endl;
             CurvatureData<double> curv_data = tet_pt_curvature_data[counter];
-         
+            // CurvatureData<double> curv_data;
+            // gaussian_func->EvaluateCurvatureData(data[0], data[1], data[2], curv_data);
             // rbf_func->EvaluateCurvatureData(data[0], data[1], data[2], curv_data);
             e1_values[counter] = curv_data.e1_;
+            // e1_values[counter] = curv_data.f_gradient_.norm();
             e2_values[counter] = curv_data.e2_;
             k1_values[counter] = curv_data.k1_;
             k2_values[counter] = curv_data.k2_;
             values[counter] = curv_data.f_val_;
+            t1_vectors[counter] = {curv_data.t1_[0], curv_data.t1_[1], curv_data.t1_[2]};
             gradients[counter] = {curv_data.f_gradient_[0], curv_data.f_gradient_[1], curv_data.f_gradient_[2]};
             PrincipleCurvature pt_curv;
             pt_curv.emax_ = curv_data.e1_;
@@ -482,6 +495,14 @@ if(crest_type != -1)
             pt_curv.tmin_ = {curv_data.t2_[0], curv_data.t2_[1], curv_data.t2_[2]};
             pt_curv.kmax_ = curv_data.k1_;
             pt_curv.kmin_ = curv_data.k2_;
+            // pt_curv.emax_ = curv_data.f_gradient_.norm();
+            // pt_curv.tmax_ = {curv_data.f_gradient_[0], curv_data.f_gradient_[1], curv_data.f_gradient_[2]};
+            // pt_curv.emin_ = curv_data.e2_;
+            // pt_curv.emax_ = curv_data.f_gradient_.dot(curv_data.t1_);
+            // pt_curv.emax_ = curv_data.f_gradient_.norm();
+            // pt_curv.kmax_ = 100; 
+            // pt_curv.kmin_ = 0;
+            
             pt_curv.de1_  = {curv_data.e1_d1_[0], curv_data.e1_d1_[1], curv_data.e1_d1_[2]};
             pt_curv.de2_  = {curv_data.e2_d2_[0], curv_data.e2_d2_[1], curv_data.e2_d2_[2]};
             pt_curv.emax_prime_ = curv_data.e1_prime_;
@@ -513,10 +534,8 @@ if(crest_type != -1)
     // << ", d e1 : " << curv_data.e1_d1_[0] << " " << curv_data.e1_d1_[1] << " "<< curv_data.e1_d1_[2] 
     // << ", d e2 : " << curv_data.e2_d2_[0] << " " << curv_data.e2_d2_[1] << " "<< curv_data.e2_d2_[2] << std::endl; 
 
-    
+
     // }
-
-
     // std::string planck_sample_path = "/home/jjxia/Documents/prejects/NN-VIPSS/data/planck_sample_pts3.xyz";
     // std::vector<double> sample_pts;
     // readXYZ(planck_sample_path, sample_pts);
@@ -568,24 +587,31 @@ if(crest_type != -1)
         marching3D::MarchingTet3D(vertices, tets, values, gradients, output_vertices, output_triangles);
 
     } else {
+
+        // marching3D::MarchingTet3D(vertices, tets, values, gradients, output_vertices, output_triangles);
         std::cout << " start MarchingTet3DCrestMesh ...... "<< std::endl;
         marching3D::MarchingTet3DCrestMesh(vertices, tets, tet_curvatures, outdir); 
         std::cout << " finish MarchingTet3DCrestMesh ...... "<< std::endl;
     }
 
-    // if(crest_type == 0)
-    // {
-    //     std::string tet_e1_path = outdir + filename + "_tet_e1.ply";
-    //     SaveTetMeshToPly(vertices, tets, e1_values, tet_e1_path);
-    //     std::string tet_k1_path = outdir + filename + "_tet_k1.ply";
-    //     SaveTetMeshToPly(vertices, tets, e1_values, tet_k1_path);
-    // } else {
-    //     std::string tet_e2_path = outdir + filename + "_tet_e2.ply";
-    //     SaveTetMeshToPly(vertices, tets, e2_values, tet_e2_path);
-    //     std::string tet_k2_path = outdir + filename + "_tet_k2.ply";  
-    //     SaveTetMeshToPly(vertices, tets, k2_values, tet_k2_path);
-    // }
-    
+    if(crest_type == 0)
+    {
+        std::string tet_vals_path = outdir + filename + "_tet_vals.ply";
+        SaveTetMeshToPly(vertices, tets, values, tet_vals_path);
+        std::string tet_grads_path = outdir + filename + "_tet_grads.xyz";
+        writeXYZnormal(tet_grads_path, vertices, gradients);
+        std::string tet_e1_path = outdir + filename + "_tet_e1.ply";
+        SaveTetMeshToPly(vertices, tets, e1_values, tet_e1_path);
+        std::string tet_k1_path = outdir + filename + "_tet_k1.ply";
+        SaveTetMeshToPly(vertices, tets, k1_values, tet_k1_path);
+        std::string tet_t1_path = outdir + filename + "_tet_t1.xyz";
+        writeXYZnormal(tet_t1_path, vertices, t1_vectors);
+    } else {
+        std::string tet_e2_path = outdir + filename + "_tet_e2.ply";
+        SaveTetMeshToPly(vertices, tets, e2_values, tet_e2_path);
+        std::string tet_k2_path = outdir + filename + "_tet_k2.ply";  
+        SaveTetMeshToPly(vertices, tets, k2_values, tet_k2_path);
+    }
     
     // return 0;
 }

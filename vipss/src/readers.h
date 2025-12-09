@@ -6,6 +6,7 @@
 #include<string>
 #include <stdint.h>
 #include "stats.h"
+#include <armadillo>
 
 // using namespace std;
 
@@ -82,9 +83,12 @@ bool writeCtrGraphFile(std::string filename, const std::vector<float> &vertices,
 bool writeCurNetFile(std::string filename, const std::vector<double> &vertices, const std::vector<std::vector<int>>&edge2vertices, const std::vector<std::vector<int>>&edgeMat, const std::vector<std::vector<double>>&planepara, const std::vector<double>&verticesNor);
 
 bool readXYZ(std::string filename, std::vector<double>&v);
+bool writeXYZ(std::string filename, std::vector<arma::vec3>&v);
 bool readXYZnormal(std::string filename, std::vector<double>&v, std::vector<double>&vn);
 bool writeXYZ(std::string filename, std::vector<double>&v);
 bool writeXYZnormal(std::string filename, std::vector<double>&v, std::vector<double>&vn);
+bool writeXYZnormal(std::string filename, std::vector<std::array<double,3>>&v, std::vector<std::array<double,3>>&vn);
+bool writeXYZnormal(std::string filename, std::vector<arma::vec3>&v, std::vector<arma::vec3>&vn);
 
 bool readPlyMesh(const std::string& filename, std::vector<std::array<double, 3>>& vts, std::vector<std::vector<size_t>>& faces);
 
@@ -110,6 +114,10 @@ void WriteVectorValsToCSV(const std::string& path, const std::vector<std::vector
 // void WriteStatsTimeCSV(const std::string& path, const VP_STATS& vp_stats);
 std::vector<double> ReadVectorFromFile(const std::string& filename) ;
 
+void SaveMeshWithQualityToPly(const std::string &filename, 
+               const std::vector<std::array<double,3>> &points, 
+               const std::vector<double>& point_qualities,
+               const std::vector<std::vector<size_t>> &faces);
 
 void SaveMeshWithQualityToPly(const std::string &filename, 
                const std::vector<std::array<double,3>> &points, 
@@ -135,6 +143,9 @@ void SaveTetMeshToPly(const std::vector<std::array<double, 3>>& vertices,
 
 void SavePointsWithQualityToPLY(const std::string& filename, 
                         const std::vector<std::array<double,3>>& points,
+                        const std::vector<double>& qualtity);
+void SavePointsWithQualityToPLY(const std::string& filename, 
+                        const std::vector<arma::vec3>& points,
                         const std::vector<double>& qualtity);
 
 bool SaveTetToFile(const std::vector<std::array<double, 3>>& vertices, 

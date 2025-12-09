@@ -156,6 +156,12 @@ void RBF_Core::Set_HermiteRBF(std::vector<double>&pts){
         }
     }
 
+    // double* pt_last = p_pts + 63 * 3;
+    // // std::cout << " M row 0" << M.row(0) << std::endl;
+    // std::cout << "p_pts 0 " << p_pts[0] << " " << p_pts[1] << " " << p_pts[2] << std::endl;
+    // std::cout << "p_pts last " << pt_last[0] << " " << pt_last[1] << " " << pt_last[2] << std::endl;
+    // Kernal_Gradient_Function_2p(p_pts,pt_last, G);
+    // std::cout << "G 0 " << G[0] << " " << G[1] << " " << G[2] << std::endl;
     //cout<<std::setprecision(5)<<std::fixed<<M<<endl;
 
     bsize= 4;
@@ -729,21 +735,21 @@ void RBF_Core::Set_RBFCoefWithOptNormalAndSval(const std::vector<double>& Vn,
 
 
 void RBF_Core::Solve_RBFCoefWithOptNormalAndSval(const std::vector<double>& Vn, 
-                                                const std::vector<double>& s_vals )
+                                                const std::vector<double>& s_vals, bool flip )
 {
-    
+    double sign = flip? -1: 1;
     newnormals = Vn;
     arma::vec y(npt + 3 * key_npt + 4);
     for(size_t i=0;i<key_npt;++i){
-        y(npt+i) = Vn[i*3];
-        y(npt+i+key_npt) = Vn[i*3+1];
-        y(npt+i+key_npt*2) = Vn[i*3+2];
+        y(npt+i) = sign * Vn[i*3];
+        y(npt+i+key_npt) = sign * Vn[i*3+1];
+        y(npt+i+key_npt*2) = sign * Vn[i*3+2];
     }
     // if(User_Lamnbda>0)
     {
         for(size_t i = 0; i < npt; ++i)
         {
-            y(i) = s_vals[i];
+            y(i) = sign * s_vals[i];
         }
     } 
     // else {
@@ -756,6 +762,12 @@ void RBF_Core::Solve_RBFCoefWithOptNormalAndSval(const std::vector<double>& Vn,
     bigM.submat(0,m_dim,m_dim-1, m_dim + 3) = N;
     bigM.submat(m_dim,0,m_dim + 3, m_dim-1) = N.t();  
 
+    // std::cout << "bigM.row(0) "<< std::endl;
+    // std::cout << bigM.row(0) << std::endl;
+
+    // std::cout << "bigM.row(10) "<< std::endl;
+    // std::cout << bigM.row(10) << std::endl;
+
     M.clear();
     N.clear();
 
@@ -764,7 +776,8 @@ void RBF_Core::Solve_RBFCoefWithOptNormalAndSval(const std::vector<double>& Vn,
     // auto t0 = Clock::now();
     // arma::mat X2 = arma::solve(bigM, y, arma::solve_opts::fast);
 
-    arma::mat X2 = arma::solve(bigM, y, arma::solve_opts::likely_sympd);
+    // arma::mat X2 = arma::solve(bigM, y, arma::solve_opts::likely_sympd);
+    arma::mat X2 = arma::solve(bigM, y, arma::solve_opts::fast);
 
     // arma::mat X2 = arma::inv(bigM) * y;
     bigM.clear();
@@ -798,6 +811,9 @@ void RBF_Core::Set_RBFCoef(arma::vec &y){
         if(User_Lamnbda>0)y.subvec(0,npt-1) = -User_Lamnbda*dI*K01*y.subvec(npt,npt + 3* key_npt-1);
         a = Minv*y;
         b = Ninv.t()*y;
+        // iso_vals_.resize(npt);
+        iso_vals_ = arma::conv_to<std::vector<double>>::from(y.rows(0, npt-1));
+
         // a.save("a.txt", arma::arma_ascii);
     }
     kern_.resize(npt + 3*key_npt); 

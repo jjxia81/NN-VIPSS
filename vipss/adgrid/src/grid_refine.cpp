@@ -123,8 +123,11 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid_mesh,
         // double tet_edge_len_limit = 0.05; 
         if(longest_edge_length > tet_max_edge_len)
         {
+            // std::cout << " longest_edge_length : " << longest_edge_length << std::endl;
             Q.emplace_back(longest_edge_length, longest_edge);
+
         } else {
+            // std::cout << " longest_edge_length : " << longest_edge_length << std::endl;
             switch (boundary_type)
             {
             case 0:
@@ -139,18 +142,9 @@ bool push_longest_edge(mtet::TetId tid, mtet::MTetMesh &grid_mesh,
             case 3:
                 OutTetObj::boundary3_eprime_tets.AddNewTet(pts);
                 break;
-            
             default:
                 break;
             }
-            // if(orientable)
-            // {
-            //     OutTetObj::limit_orientable_tets.AddNewTet(pts);
-            // } else {
-                
-            //     OutTetObj::limit_unorientable_tets.AddNewTet(pts);
-            // }
-            
         }
         //eval_timer.Stop();
         return true;
@@ -183,14 +177,20 @@ bool gridRefine(
     
     IndexMap vertex_func_grad_map;
     vertex_func_grad_map.reserve(grid.get_num_vertices());
+
+    std::cout << "grid pts number : " << grid.get_num_vertices() << std::endl;
     
     /// hash for mounting a boolean that represents the activeness to a tet
     
     tetActive tet_active_map;
     tet_active_map.reserve(grid.get_num_tets());
 
+    std::cout << "grid tets number : " << grid.get_num_tets() << std::endl;
+
     grid.seq_foreach_vertex([&](VertexId vid, std::span<const Scalar, 3> data)
                             {vertex_func_grad_map[value_of(vid)] = func(data, funcNum);});
+
+    std::cout << "grid tets number 22 : " << grid.get_num_tets() << std::endl;
 
     auto comp = [](std::pair<mtet::Scalar, mtet::EdgeId> e0,
                    std::pair<mtet::Scalar, mtet::EdgeId> e1)
@@ -460,11 +460,6 @@ bool gridRefineRidges(
         while (!Q.empty())
         {
             // std::cout << " q stack loop count " << loop_id << std::endl;
-            // loop_id ++;
-            // if(loop_id > max_tet_num)
-            // {
-            //     break;
-            // }
             std::pop_heap(Q.begin(), Q.end(), comp);
             auto [edge_length, eid] = Q.back();
             if (!grid.has_edge(eid)){
@@ -473,6 +468,7 @@ bool gridRefineRidges(
             }
             //implement alpha value:
             mtet::Scalar comp_edge_length = alpha * edge_length;
+            // mtet::Scalar comp_edge_length = tet_max_edge_len;
             // std::cout << " comp_edge_length " << comp_edge_length << std::endl;
             bool addedActive = false;
             grid.foreach_tet_around_edge(eid,[&](mtet::TetId tid){

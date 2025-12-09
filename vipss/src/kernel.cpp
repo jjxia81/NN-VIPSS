@@ -120,6 +120,65 @@ void XCube_HessianDot_Kernel_2p(const double *p1, const double *p2, const double
 }
 
 
+double fifthPower_Kernel(const double x){
+
+    return pow(x,5);
+}
+
+double fifthPower_Kernel_2p(const double *p1, const double *p2){
+
+
+    return fifthPower_Kernel(Vec_Dist(p1,p2));
+
+}
+
+void fifthPower_Gradient_Kernel_2p(const double *p1, const double *p2, double *G){
+
+
+    double len_dist  = Vec_Dist(p1,p2);
+    for(int i=0;i<3;++i)G[i] = 5*pow(len_dist,3)*(p1[i]-p2[i]);
+    return;
+
+}
+
+
+double fifthPower_GradientDot_Kernel_2p(const double *p1, const double *p2, const double *p3){
+
+    double G[3];
+    fifthPower_Gradient_Kernel_2p(p1,p2,G);
+    return Vec_Dot(p3,G);
+}
+
+void fifthPower_Hessian_Kernel_2p(const double *p1, const double *p2, double *H){
+
+    double diff[3];
+    for(int i=0;i<3;++i)diff[i] = p1[i] - p2[i];
+    double len_dist  = Vec_Len(diff);
+
+    if(len_dist<1e-8){
+        for(int i=0;i<9;++i)H[i] = 0;
+    }else{
+        for(int i=0;i<3;++i)for(int j=0;j<3;++j)
+            if(i==j)H[i*3+j] = 15 * pow(diff[i],2) * len_dist + 5 * pow(len_dist,3);
+            else H[i*3+j] = 15 * diff[i] * diff[j] * len_dist;
+    }
+    return;
+}
+
+void fifthPower_HessianDot_Kernel_2p(const double *p1, const double *p2, const double *p3, std::vector<double>&dotout){
+
+    double H[9];
+    fifthPower_Hessian_Kernel_2p(p1,p2,H);
+    dotout.resize(3);
+    for(int i=0;i<3;++i){
+        dotout[i] = 0;
+        for(int j=0;j<3;++j){
+            dotout[i] += H[i*3+j] * p3[j];
+        }
+    }
+}
+
+
 arma::mat BuildHrbfMat(std::vector<double>&pts){
     int npt = int(pts.size()/3);
     int key_npt = npt;

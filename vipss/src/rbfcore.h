@@ -61,12 +61,14 @@ enum RBF_Kernal{
     ThinSpline,
     XLinear,
     Gaussian,
+    FifthPower
 };
 
 class RBF_Paras{
 public:
     RBF_METHOD Method = RBF_METHOD::Hermite_UnitNormal;
     RBF_Kernal Kernal = XCube;
+    // RBF_Kernal Kernal = FifthPower;
     RBF_InitMethod InitMethod = Lamnbda_Search;
     bool isusesparse = false;
     int polyDeg = 1;
@@ -105,7 +107,8 @@ public:
     double sigma = 0.9;
     double inv_sigma_squarex2 = 1;
 
-    RBF_Kernal kernal = XCube;
+    // RBF_Kernal kernal = XCube;
+    RBF_Kernal kernal = FifthPower;
     RBF_METHOD curMethod = RBF_METHOD::Hermite_UnitNormal;
     RBF_InitMethod curInitMethod = Lamnbda_Search;
 
@@ -126,6 +129,7 @@ public:
     std::vector<double>initnormals_uninorm;
 
 public:
+    std::vector<double>iso_vals_;
     std::vector<double>newnormals;
     std::vector<double>out_normals_;
 
@@ -273,7 +277,7 @@ public:
     void Set_RBFCoefWithOptNormalAndSval(const std::vector<double>& Vn, 
                                                 const std::vector<double>& s_vals );
     void Solve_RBFCoefWithOptNormalAndSval(const std::vector<double>& Vn, 
-                                                const std::vector<double>& s_vals );
+                                                const std::vector<double>& s_vals, bool flip = false);
 
     void Set_Actual_Hermite_LSCoef(double hermite_ls);
     void Set_HermiteApprox_Lamnda(double hermite_ls);
