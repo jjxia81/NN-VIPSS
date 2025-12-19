@@ -138,7 +138,6 @@ bool TetCrestTypeTest(const Eigen::RowVector4d& kmax_vals, const Eigen::RowVecto
             }
         }
     } else {
-
         for(int pid = 0; pid < 4; ++ pid)
         {
             // std::cout << " start kk compare ..." << pid << std::endl;
@@ -148,8 +147,25 @@ bool TetCrestTypeTest(const Eigen::RowVector4d& kmax_vals, const Eigen::RowVecto
             }
         }
     }
-    
     return false;
+}
+
+
+bool TetCrestRVTypeTest(const Eigen::RowVector4d& kmax_vals, const Eigen::RowVector4d& kmin_vals, 
+    int& ridge_pt_count, int& valley_pt_count)
+{
+    Eigen::RowVector4d kmaxmin_vals = kmax_vals + kmin_vals;
+    int p_count = 0;
+    int n_count = 0;
+    for(int i = 0;i < 4; ++i)
+    {
+        kmaxmin_vals[i] > 0 ? p_count++ : n_count++;
+    }
+    ridge_pt_count = p_count;
+    valley_pt_count = n_count;
+    bool rv_refine = false;
+    if(p_count * n_count > 0) rv_refine = true;
+    return rv_refine;
 }
 
 bool TetCrestTypeTest2(const Eigen::RowVector4d& kmax_vals, const Eigen::RowVector4d& kmin_vals, const int crest_type, int& count)
@@ -587,6 +603,7 @@ double  bezierSampleValsWithHashSimple(
 {
     auto vs = grid_mesh.get_tet(tid);
     std::array<uint64_t,4> tet_pids;
+    Eigen::RowVector4d e2_vals;
     std::array<std::array<double,3>, 4> tet_pts_coords;
     for (int i = 0; i < 4; ++i)
     {
@@ -594,7 +611,18 @@ double  bezierSampleValsWithHashSimple(
         tet_pids[i] = vid.value_of();
         auto coords = grid_mesh.get_vertex(vid);
         tet_pts_coords[i] = {coords[0], coords[1], coords[2]};
+        // if(crest_type == 1)
+        // {
+        //     CurvatureData<double> cur_data;
+        //     Hermite_RBF<double>::hrbf_ptr_->EvaluateCurvatureData(coords[0], coords[1], coords[2], cur_data);
+        //     e2_vals[i] = cur_data.e2_;
+        // }
     }
+    // if(crest_type == 1)
+    // {
+    //     std::cout << " tet e2 vals  : " << vals << std::endl;
+    //     std::cout << " estimate e2 vals  : " << e2_vals << std::endl;
+    // }
     Eigen::RowVector<double, 6> sample_vals;
     Eigen::RowVector<double, 6> linear_vals;
     Eigen::Vector3d k_dir_main = k_dirs.row(0);
@@ -969,8 +997,6 @@ bool critIARidge(
         // func_info << tet_info[0][funcIter].transpose(), tet_info[1][funcIter].transpose(), 
         //              tet_info[2][funcIter].transpose(), tet_info[3][funcIter].transpose();
         // Eigen::RowVector4d vals = func_info.col(0);
-
-
         Eigen::RowVector4d f_vals;
         Eigen::RowVector4d emax_prime_vals;
         Eigen::RowVector4d emin_prime_vals;
@@ -1002,94 +1028,85 @@ bool critIARidge(
         auto bezier_f_vals = bezierConstruct(f_vals, f_grads, vec);
         bool zero_cross_iso = get_sign(bezier_f_vals.maxCoeff()) != get_sign(bezier_f_vals.minCoeff());
         
+        // double iso_offset_val = 0.05;
         double iso_offset_val = 0.05;
-        // double iso_offset_val = 0.1;
-        // if(!zero_cross_iso)
-        // {
-        //     return false;
-        //     // auto bezier_f_vals_abs = bezier_f_vals.cwiseAbs();
-        //     // if(bezier_f_vals_abs.minCoeff() > iso_offset_val)
-        //     // {
-        //     //     return false;
-        //     // }
-        // }
-        bool test_linear = false;
-        if (test_linear)
+        if(!zero_cross_iso)
         {
-            Eigen::Vector3d unNormF = Eigen::RowVector3d(f_vals(1)-f_vals(0), f_vals(2)-f_vals(0), f_vals(3)-f_vals(0)) * crossMatrix.transpose();
-            gradList.row(funcIter) = unNormF;
-            diffList.row(funcIter) = bezierDiff(bezier_f_vals);
-            double error = std::max(diffList.row(funcIter).maxCoeff(), - diffList.row(funcIter).minCoeff());
-            //Timer single2_timer(singleFunc, [&](auto profileResult){profileTimer = combine_timer(profileTimer, profileResult);});
-            double lhs = error * error * sqD;
-            double rhs;
-            if (!curve_network){
-                rhs = threshold * threshold * gradList.row(funcIter).squaredNorm();
-            }else{
-                rhs = std::numeric_limits<double>::infinity() * gradList.row(funcIter).squaredNorm();
+            // return false;
+            auto bezier_f_vals_abs = bezier_f_vals.cwiseAbs();
+            if(bezier_f_vals_abs.minCoeff() > iso_offset_val)
+            {
+                return false;
             }
-            if (lhs > rhs) {
-                //single2_timer.Stop();
-                return true;
-            }
-            //single2_timer.Stop();
         }
         // std::cout << " finish assign curvature data info ..." << std::endl;
         // 0 stands for rigdes, 1 for valleys
         // bool is_target_crest_type = TetCrestTypeTest(kmax_vals, kmin_vals, crest_type);
-        auto& k_dirs = crest_type == 0 ? k1_dirs : k2_dirs;
-        auto& e_vals = crest_type == 0 ? emax_vals : emin_vals;
-        int rv_tet_pt_count = 0;
-        // bool is_target_crest_type = TetCrestTypeTest2(kmax_vals, kmin_vals, crest_type, rv_tet_pt_count);
-        bool is_target_crest_type = TetHeightCrestTypeTest(kmax_vals, kmin_vals, crest_type, rv_tet_pt_count);
-        // bool is_target_crest_type = true;
-        // if(!is_target_crest_type)
+        // Eigen::RowVector4d gaussian_e_vals = emax_vals.array() * emin_vals.array();
+        // if(gaussian_e_vals.maxCoeff() * gaussian_e_vals.minCoeff() > 0)
         // {
-        //     OutTetObj::rv_failed_tets.AddNewTet(pts);
-        //     return false;
-        // } 
-        
-        const auto& e_prime_vals = crest_type == 0? emax_prime_vals : emin_prime_vals;
-        int e_prime_count = 0;
-        bool e_prime_sign_consistent = TetEPrimeSignTest(e_prime_vals, crest_type, e_prime_count);
-        // if(!e_prime_sign_consistent)
-        // {
-        //     OutTetObj::eprime_failed_tets.AddNewTet(pts);
         //     return false;
         // }
+
+        int ridge_p_count = 0; int valley_p_count = 0;
+        bool rv_refine = TetCrestRVTypeTest(kmax_vals, kmin_vals, ridge_p_count, valley_p_count);
+        // std::cout << " "
         
-        orientable = CheckTetOrientable(e_vals, k_dirs);
-        if(orientable) 
+        int RV_type = -1;
+        Eigen::RowVector4d e_vals;
+        Eigen::Matrix<double, 4, 3> k_dirs;
+        
+        if(ridge_p_count == 4)
+        {
+            orientable = CheckTetOrientable(emax_vals, k1_dirs);
+            e_vals = emax_vals;
+            k_dirs = k1_dirs;
+            RV_type = 0;
+        } else if(valley_p_count == 4)
+        {
+            orientable = CheckTetOrientable(emin_vals, k2_dirs);
+            e_vals = emin_vals;
+            k_dirs = k2_dirs;
+            RV_type = 1; 
+        } else {
+            if(TetPerEdgeZeroCrossingTest(k1_dirs, emax_vals) || 
+               TetPerEdgeZeroCrossingTest(k2_dirs, emin_vals))
+            {
+                bool active = true;
+                boundary_type = 2;
+                return active;
+            }
+            return false;
+        }
+        // auto& e_vals = crest_type == 0 ? emax_vals : emin_vals;
+        
+        if(orientable ) 
         {
             active = e_vals.maxCoeff() * e_vals.minCoeff() < 0;
+            if(! active) return false;
         } else {
-            // OutTetObj::unoriented_tets.AddNewTet(pts);
             boundary_type = 1;
-            // active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
-            active = true;
+            bool refine = true;
             return true;
         }
-        // if(!active) 
-        // {
-        //     return false;
-        // }
-        if(rv_tet_pt_count < 4 && rv_tet_pt_count > 0)
+
+        const auto& e_prime_vals = RV_type == 0? emax_prime_vals : emin_prime_vals;
+        int e_prime_count = 0;
+        bool e_prime_sign_consistent = TetEPrimeSignTest(e_prime_vals, RV_type, e_prime_count);
+        
+        if(!e_prime_sign_consistent)
         {
-            // active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
-            active = true;
-            boundary_type = 2;
-            return active;
+            OutTetObj::eprime_failed_tets.AddNewTet(pts);
+            return false;
         }
+      
         if(e_prime_count < 4 && e_prime_count > 0)
         {
             boundary_type = 3;
-            active = true;
             // active = TetPerEdgeZeroCrossingTest(k_dirs, e_vals);
             return true;
         }
-
-        return true;
-
+        // return true;
         //single_timer.Stop();
         // if (activeTF[funcIter])
         {
@@ -1103,7 +1120,7 @@ bool critIARidge(
             // double error = std::max(diffList.row(funcIter).maxCoeff(), -diffList.row(funcIter).minCoeff());
             // std::cout << "error 0  : " << error << std::endl;
             // double error = bezierSampleValsWithHash(tid, grid_mesh, pts, e_vals, k_dirs, crest_type);
-            double error = bezierSampleValsWithHashSimple(tid, grid_mesh, pts, e_vals, k_dirs, crest_type);
+            double error = bezierSampleValsWithHashSimple(tid, grid_mesh, pts, e_vals, k_dirs, RV_type);
             // std::cout << "error 1  : " << error << " threshold " << threshold << std::endl;
             //Timer single2_timer(singleFunc, [&](auto profileResult){profileTimer = combine_timer(profileTimer, profileResult);});
             double lhs = error * error * sqD;

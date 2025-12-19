@@ -17,6 +17,8 @@ Eigen::VectorXd res_vec_g;
 Eigen::VectorXd scsc_vec;
 bool is_alpha_initialized = false;
 double soft_constraints_alpha = 10.0;
+marching3D::CrestMeshData out_crest_mesh_data;
+
 
 void VIPSSUnit::InitPtNormalWithLocalVipss()
 {
@@ -865,8 +867,8 @@ void VIPSSUnit::GenerateAdaptiveGrid()
         std::vector<std::array<size_t, 3> > output_triangles;
         GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
                                 local_vipss_.voro_gen_.bbox_max_, crest_type, tet_size_limit,
-                                out_dir_,  
-                                file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
+                                out_dir_,  file_name_,  functions, adgrid_threshold_,
+                                output_vertices, output_triangles, out_crest_mesh_data);
         auto t001 = Clock::now();
         for(auto& pt : output_vertices)
         {
@@ -954,7 +956,8 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
     printf("start adaptive grid generation ...... \n");
       
     GenerateAdaptiveGridOut(resolution, bbox_min, bbox_max, crest_type, tet_size_limit, out_dir_,  
-                            file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
+                            file_name_,  functions, adgrid_threshold_, 
+                            output_vertices, output_triangles, out_crest_mesh_data);
     auto t001 = Clock::now();
     G_VP_stats.adgrid_gen_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;
     printf("adaptive grid generation time : %f ! \n", G_VP_stats.adgrid_gen_time_);
@@ -1332,12 +1335,12 @@ void VIPSSUnit::RunRidgesGHRBF2()
     std::vector<double> pt_normals;
     // readXYZ(input_data_path_, pts);
     readXYZnormal(input_data_path_, pts, pt_normals);
-    // NormalizeInputPoints(pts);
+    NormalizeInputPoints(pts);
     // local_vipss_.Init(pts);
     
     std::cout << " read input pts size :  " << pts.size() / 3 << std::endl;
     std::shared_ptr<RBF_Core> rbf_ptr = std::make_shared<RBF_Core>();
-    bool use_input_normal = true;
+    bool use_input_normal = false;
     std::vector<double> s_vals(pts.size()/3, -10);
     if(!use_input_normal)
     {
@@ -1348,10 +1351,10 @@ void VIPSSUnit::RunRidgesGHRBF2()
         s_vals = rbf_ptr->iso_vals_;
     } 
 
-    for(int i = 0; i < pts.size()/3; ++i)
-    {
-        s_vals[i] = -1.0;
-    }
+    // for(int i = 0; i < pts.size()/3; ++i)
+    // {
+    //     s_vals[i] = -1.0;
+    // }
 
     // for(int i = 0; i < pts.size()/3; ++i)
     // {
@@ -1370,9 +1373,9 @@ void VIPSSUnit::RunRidgesGHRBF2()
                         + pt_normals[3*i + 2] * pt_normals[3*i + 2]);
         if(abs(len) > 1e-12)
         {
-            pt_normals[3*i] /= -len;
-            pt_normals[3*i + 1] /= -len;      
-            pt_normals[3*i + 2] /= -len; 
+            pt_normals[3*i] /= len;
+            pt_normals[3*i + 1] /= len;      
+            pt_normals[3*i + 2] /= len; 
         }
     }
     
@@ -1411,14 +1414,15 @@ void VIPSSUnit::RunRidgesGHRBF2()
     std::cout << "output_triangles :  " << output_triangles.size() << std::endl;
     auto tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh" + std::to_string(user_lambda_)+".ply";
     SaveMeshToPly(tet_mesh_path, output_vertices, output_triangles);
-    std::string ridge_mesh_save_path =  out_dir_ + "ridge_mesh.ply";
-    std::string valley_mesh_save_path = out_dir_ + "valley_mesh.ply";
-    std::vector<std::array<double, 3>> ridge_mesh_pts;
-    std::vector<std::array<double, 3>> valley_mesh_pts;
-    std::vector<std::vector<size_t>> ridge_mesh_faces;
-    std::vector<std::vector<size_t>> valley_mesh_faces;
-    readPlyMesh(ridge_mesh_save_path, ridge_mesh_pts, ridge_mesh_faces);
-    readPlyMesh(valley_mesh_save_path, valley_mesh_pts, valley_mesh_faces);
+    // std::string ridge_mesh_save_path =  out_dir_ + "ridge_mesh.ply";
+    // std::string valley_mesh_save_path = out_dir_ + "valley_mesh.ply";
+    const std::vector<std::array<double, 3>>& ridge_mesh_pts = out_crest_mesh_data.emax_inter_pts_g;
+    const std::vector<std::array<double, 3>>& valley_mesh_pts = out_crest_mesh_data.emin_inter_pts_g;
+    const std::vector<std::vector<size_t>>& ridge_mesh_faces = out_crest_mesh_data.emax_mesh_faces_g;
+    const std::vector<std::vector<size_t>>& valley_mesh_faces = out_crest_mesh_data.emin_mesh_faces_g;
+
+    // readPlyMesh(ridge_mesh_save_path, ridge_mesh_pts, ridge_mesh_faces);
+    // readPlyMesh(valley_mesh_save_path, valley_mesh_pts, valley_mesh_faces);
 
     std::vector<double> ridge_mesh_pts_dist_vals; 
     std::vector<double> valle_mesh_pts_dist_vals;
@@ -1426,26 +1430,27 @@ void VIPSSUnit::RunRidgesGHRBF2()
 
     // auto hrbf_func = std::make_shared<Hermite_RBF<double>>(in_points, hrbf_a, hrbf_b, iso_offset_val_);
     // auto hrbf_func  = Hermite_RBF<double>::hrbf_ptr_;
-    // for(const auto& pt : ridge_mesh_pts)
-    // {
-    //     PrincipleCurvature cur_cuv_data;
-    //     VIPSSRidges::CalSinglePointCurvatureData(pt, cur_cuv_data);
-    //     // hrbf_func->evaluate_gradient()
-    //     // CurvatureData<double> curv_data;
-    //     // hrbf_func->EvaluateCurvatureData(pt[0], pt[1], pt[2], curv_data);
-    //     ridge_mesh_pts_k1_vals.push_back(cur_cuv_data.k1_);
-    //     double dist = rbf_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
-    //     ridge_mesh_pts_dist_vals.push_back(dist);
-    // }
-    // for(const auto& pt : valley_mesh_pts)
-    // {
-    //     double dist = rbf_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
-    //     valle_mesh_pts_dist_vals.push_back(dist);
-    // }
-    std::string ridge_mesh_quality_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_quality.ply";
+    for(const auto& pt : ridge_mesh_pts)
+    {
+        PrincipleCurvature cur_cuv_data;
+        VIPSSRidges::CalSinglePointCurvatureData(pt, cur_cuv_data);
+        // hrbf_func->evaluate_gradient()
+        // CurvatureData<double> curv_data;
+        // hrbf_func->EvaluateCurvatureData(pt[0], pt[1], pt[2], curv_data);
+        ridge_mesh_pts_k1_vals.push_back(cur_cuv_data.k1_);
+        // Hermite_RBF<double>::hrbf_ptr_->eve
+        double dist = rbf_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
+        ridge_mesh_pts_dist_vals.push_back(dist);
+    }
+    for(const auto& pt : valley_mesh_pts)
+    {
+        double dist = rbf_ptr->Dist_Function(R3Pt(pt[0], pt[1], pt[2]));
+        valle_mesh_pts_dist_vals.push_back(dist);
+    }
+    // std::string ridge_mesh_quality_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_quality.ply";
     // SaveMeshWithQualityToPly(ridge_mesh_quality_path, ridge_mesh_pts, ridge_mesh_pts_k1_vals, ridge_mesh_faces);
 
-    return;
+    // return;
     
     // std::string ridge_mesh_curve_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_curve_0.obj";
     // VIPSSRidges::ExtractLevelSetCurvesOnMesh(ridge_mesh_pts, ridge_mesh_faces, 
@@ -1455,11 +1460,13 @@ void VIPSSUnit::RunRidgesGHRBF2()
  
     double offset_step = 0.01;
     int offset_num = 4;
-    for(int i = -offset_num; i <= offset_num; ++i)
+    // for(int i = -offset_num; i <= offset_num; ++i)
     {
+        int i = 0;
         double cur_offset_val = offset_step * i;
         double u = (i + offset_num) / double(2 * offset_num);
         RGBColor cur_color = ErrorColorBlend(u);
+
         std::array color = {cur_color.r, cur_color.g, cur_color.b};
         std::string ridge_mesh_curve_path = out_dir_ + "/" + file_name_ +"_ridgeMesh_curve_" 
                                 + std::to_string(cur_offset_val) + ".obj";
@@ -1472,19 +1479,28 @@ void VIPSSUnit::RunRidgesGHRBF2()
     std::string curve_key = oss.str();
     // auto& inter_pts = curves_pts_map[key];
     // auto& curve_edges = curves_edges_map[key];
-    double max_iso_val = 0.1;
-    if(0)
+    double max_iso_val = 0.05;
+    if(1)
     {
     std::string curve_consistence_path = out_dir_ + "/" + file_name_ +"_ridge_curve_consistence.ply";
     VIPSSRidges::CalCurvesPtsConsistence( ridge_mesh_pts,  ridge_mesh_faces, ridge_mesh_pts_dist_vals,
                 curve_key, curve_consistence_path, max_iso_val);
     std::cout << " finish CalCurvesPtsConsistence " << std::endl;
-    std::string curve_search_pt_path = out_dir_ + "/search_pts_all.ply";
+    std::string curve_search_pt_path = out_dir_ + "/search_pts_ridge_all.ply";
     SavePointsWithQualityToPLY(curve_search_pt_path, VIPSSRidges::search_pts_all, VIPSSRidges::search_pts_iso_vals);
 
     std::string valle_mesh_curve_path = out_dir_ + "/" + file_name_ +"_valleMesh_curve.obj";
     VIPSSRidges::ExtractLevelSetCurvesOnMesh(valley_mesh_pts, valley_mesh_faces, 
                             valle_mesh_pts_dist_vals, valle_mesh_curve_path, 0, {0,0,0});
+    
+    VIPSSRidges::search_pts_all.clear();
+    VIPSSRidges::search_pts_iso_vals.clear();
+    curve_consistence_path = out_dir_ + "/" + file_name_ +"_valley_curve_consistence.ply";
+    VIPSSRidges::CalCurvesPtsConsistence( valley_mesh_pts,  valley_mesh_faces, valle_mesh_pts_dist_vals,
+                curve_key, curve_consistence_path, max_iso_val);
+    std::string curve_search_pt_path2 = out_dir_ + "/search_pts_valley_all.ply";
+    SavePointsWithQualityToPLY(curve_search_pt_path2, VIPSSRidges::search_pts_all, VIPSSRidges::search_pts_iso_vals);
+
     }
     // vipss_ridges_.ProjectMeshPtsToSurface(output_vertices, rfb_ptr);
     // tet_mesh_path = out_dir_ + "/" + file_name_ + "_mesh_projected" + std::to_string(user_lambda_)+".ply";

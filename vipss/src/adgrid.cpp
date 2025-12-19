@@ -20,7 +20,7 @@
 #include "csg.h"
 #include "grid_mesh.h"
 #include "grid_refine.h"
-#include "marching3D.h"
+
 
 using json = nlohmann::json;
 using namespace mtet;
@@ -226,7 +226,8 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
                              std::vector<shared_ptr<ImplicitFunction<double>>>& functions,
                              double in_threshold,
                              std::vector<std::array<double, 3> >& output_vertices,
-                            std::vector<std::array<size_t, 3> >& output_triangles)
+                            std::vector<std::array<size_t, 3> >& output_triangles, 
+                            marching3D::CrestMeshData& out_mesh_data)
 
 // int main(int argc, const char *argv[])
 {
@@ -266,8 +267,8 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     // expand_bbox_min = { -0.762772, -0.220353, 0.525951};
     // expand_bbox_max = { 0.488482,  0.977300,  1.989450};
 
-    expand_bbox_min = { -4.3, -4.3, -1.5};
-    expand_bbox_max = { 4.3,  4.3,  1.5};
+    // expand_bbox_min = { -4.3, -4.3, -1.5};
+    // expand_bbox_max = { 4.3,  4.3,  1.5};
     mtet::MTetMesh grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
 
 
@@ -419,7 +420,7 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
             {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}}
         }
     };
-    // std::shared_ptr<Hermite_RBF<double>> rbf_func = std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[0]);
+    std::shared_ptr<Hermite_RBF<double>> rbf_func = std::dynamic_pointer_cast<Hermite_RBF<double>>(functions[0]);
 
 if(crest_type != -1)
 { 
@@ -588,24 +589,25 @@ if(crest_type != -1)
 
     } else {
 
-        // marching3D::MarchingTet3D(vertices, tets, values, gradients, output_vertices, output_triangles);
+        marching3D::MarchingTet3D(vertices, tets, values, gradients, output_vertices, output_triangles);
         std::cout << " start MarchingTet3DCrestMesh ...... "<< std::endl;
-        marching3D::MarchingTet3DCrestMesh(vertices, tets, tet_curvatures, outdir); 
+        
+        marching3D::MarchingTet3DCrestMesh(vertices, tets, tet_curvatures, outdir, out_mesh_data); 
         std::cout << " finish MarchingTet3DCrestMesh ...... "<< std::endl;
     }
 
     if(crest_type == 0)
     {
-        std::string tet_vals_path = outdir + filename + "_tet_vals.ply";
-        SaveTetMeshToPly(vertices, tets, values, tet_vals_path);
-        std::string tet_grads_path = outdir + filename + "_tet_grads.xyz";
-        writeXYZnormal(tet_grads_path, vertices, gradients);
-        std::string tet_e1_path = outdir + filename + "_tet_e1.ply";
-        SaveTetMeshToPly(vertices, tets, e1_values, tet_e1_path);
-        std::string tet_k1_path = outdir + filename + "_tet_k1.ply";
-        SaveTetMeshToPly(vertices, tets, k1_values, tet_k1_path);
-        std::string tet_t1_path = outdir + filename + "_tet_t1.xyz";
-        writeXYZnormal(tet_t1_path, vertices, t1_vectors);
+        // std::string tet_vals_path = outdir + filename + "_tet_vals.ply";
+        // SaveTetMeshToPly(vertices, tets, values, tet_vals_path);
+        // std::string tet_grads_path = outdir + filename + "_tet_grads.xyz";
+        // writeXYZnormal(tet_grads_path, vertices, gradients);
+        // std::string tet_e1_path = outdir + filename + "_tet_e1.ply";
+        // SaveTetMeshToPly(vertices, tets, e1_values, tet_e1_path);
+        // std::string tet_k1_path = outdir + filename + "_tet_k1.ply";
+        // SaveTetMeshToPly(vertices, tets, k1_values, tet_k1_path);
+        // std::string tet_t1_path = outdir + filename + "_tet_t1.xyz";
+        // writeXYZnormal(tet_t1_path, vertices, t1_vectors);
     } else {
         std::string tet_e2_path = outdir + filename + "_tet_e2.ply";
         SaveTetMeshToPly(vertices, tets, e2_values, tet_e2_path);

@@ -378,27 +378,29 @@ public:
         // std::cout << " Hrbf : finish evaluate_gradient ..." << std::endl;
         Mat33 hessian = Mat33::Zero();
         EvaluateHessian(x, y, z, hessian);
-
-        if(0)
+        if(1)
     {
-        // std::cout << " Hrbf : finish EvaluateHessian ..." << std::endl;
         Tensor3D third_derivs = ConstTensor3D;
         ComputeThirdDerivatives(x, y, z, third_derivs);
-
-        // Tensor4D fourth_derivs = ConstTensor4D;
-        // ComputeFourthDerivatives(x, y, z, fourth_derivs);
+        Tensor4D fourth_derivs = ConstTensor4D;
+        ComputeFourthDerivatives(x, y, z, fourth_derivs);
         // std::cout << " Hrbf : finish ComputeFourthDerivatives ..." << std::endl;
         // ComputeThirdDerivatives
         cur_data = ComputePrincipalCurvaturesMonga(gradient, hessian);
         // std::cout << " Hrbf : finish ComputePrincipalCurvaturesMonga ..." << std::endl;
         cur_data.e1_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t1_);
         cur_data.e2_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t2_);
+        cur_data.e1_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
+                                         fourth_derivs, cur_data.t1_, cur_data.k1_, cur_data.e1_);
+        cur_data.e2_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
+                                         fourth_derivs, cur_data.t2_, cur_data.k2_, cur_data.e2_);    
     }
+    //  //height ridge
+    if(0)
+    {
         Eigen::SelfAdjointEigenSolver<Mat33> solver(hessian);
         Vec3 eigenValues = solver.eigenvalues();
-        // std::cout << "eigen vals " << eigenValues << std::endl;
         Mat33 eigenVectors = solver.eigenvectors();
-        // double maxEval = evals(2);               // largest eigenvalue
         cur_data.k1_ = eigenValues[0];
         cur_data.k2_ = eigenValues[2];
         cur_data.t1_ = eigenVectors.col(0);
@@ -407,10 +409,9 @@ public:
         cur_data.e2_  = gradient.dot(cur_data.t2_);
         cur_data.e1_prime_ = eigenVectors.col(0).transpose() * hessian * eigenVectors.col(0);
         cur_data.e2_prime_ = eigenVectors.col(2).transpose() * hessian * eigenVectors.col(2);
-        // cur_data.e1_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
-        //                                  fourth_derivs, cur_data.t1_, cur_data.k1_, cur_data.e1_);
-        // cur_data.e2_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
-        //                                  fourth_derivs, cur_data.t2_, cur_data.k2_, cur_data.e2_);    
+    }
+    
+        
         cur_data.f_gradient_ = gradient;
         cur_data.f_val_ = f_val_;
         // std::cout << " Hrbf : finish ComputeCurvatureDerivative2 ..." << std::endl;

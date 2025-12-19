@@ -246,6 +246,11 @@ void MarchingTetPrism(const std::vector<std::array<Float, 4> >& vertices,
                       std::vector<std::array<size_t, 3> >& output_triangles,
                       bool prism_insert_cycle_center = false);
 
+// extern  std::vector<std::vector<size_t>> emax_mesh_faces_g;
+// extern  std::vector<std::vector<size_t>> emin_mesh_faces_g;
+// extern  std::vector<std::array<double,3>> emax_inter_pts_g; 
+// extern  std::vector<std::array<double,3>> emin_inter_pts_g; 
+
 // extern template void MarchingTetPrism<double>(const std::vector<std::array<double, 4> >& vertices,
 //                                               const std::vector<std::array<size_t, 4> >& tets,
 //                                               const std::vector<std::array<size_t, 6> >& prisms,
@@ -283,6 +288,15 @@ void MarchingTet3D(const std::vector<std::array<Float, 3> >& vertices,
                    std::vector<std::array<Float, 3> >& output_vertices,
                    std::vector<std::array<size_t, 3> >& output_triangles);
 
+
+struct CrestMeshData{
+   std::vector<std::vector<size_t>> emax_mesh_faces_g;
+   std::vector<std::vector<size_t>> emin_mesh_faces_g;
+   std::vector<std::array<double,3>> emax_inter_pts_g;
+   std::vector<std::array<double,3>> emin_inter_pts_g;
+};
+
+
 /**
  * @brief Given a list of vertices, tetrahedrons,  scalar values, and gradients (optional) at each vertex,
  * compute the zero-surface as a list of 3D zero-crossing points and a list of 2D triangular faces.
@@ -300,7 +314,9 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
                    const std::vector<Float>& values,
                    const std::vector<std::array<Float, 3> >& gradients,
                    std::vector<std::array<Float, 3> >& output_vertices,
-                   std::vector<std::array<size_t, 3> >& output_triangles);
+                   std::vector<std::array<size_t, 3> >& output_triangles,
+                  CrestMeshData& out_mesh_data);
+
 
 template <typename Float>
 void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
@@ -308,7 +324,8 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
                 //    const std::vector<Float>& values, 
                 //    const std::vector<std::array<Float, 3> >& gradients,
                    const std::vector<PrincipleCurvature>& pt_curvatures,
-                   const std::string& out_dir); 
+                   const std::string& out_dir, CrestMeshData& out_mesh_data); 
+
 
 // extern template void MarchingTet3D<double>(const std::vector<std::array<double, 3> >& vertices,
 //                                            const std::vector<std::array<size_t, 4> >& tets,

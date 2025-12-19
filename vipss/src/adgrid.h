@@ -5,6 +5,7 @@
 #include "local_vipss.hpp"
 #include <CLI/CLI.hpp>
 #include "vipss_ridges.h"
+#include "marching3D.h"
 
 // #include "adgrid/timer.h"
 // #include "adgrid/csg.h"
@@ -143,5 +144,6 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
                             std::vector<shared_ptr<ImplicitFunction<double>>>& functions,
                             double threshold,
                             std::vector<std::array<double, 3> >& output_vertices,
-                            std::vector<std::array<size_t, 3> >& output_triangles);
+                            std::vector<std::array<size_t, 3> >& output_triangles,
+                        marching3D::CrestMeshData& out_mesh_data);
 

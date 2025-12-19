@@ -178,6 +178,9 @@ const std::vector<std::vector<std::vector<size_t> > > prism_table_cycles = {
     {{3, 5, 8, 7}}, {{3, 4, 7}}, {{4, 5, 8}}, {}
 };
 
+
+
+
 // Custom hash function for a std::pair
 struct pair_hash {
   template <class T1, class T2>
@@ -1272,7 +1275,7 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
                    const std::vector<Float>& values, 
                    const std::vector<std::array<Float, 3> >& gradients,
                    std::vector<std::array<Float, 3> >& output_vertices,
-                   std::vector<std::array<size_t, 3> >& output_triangles) {
+                   std::vector<std::array<size_t, 3> >& output_triangles, CrestMeshData& out_mesh_data) {
     assert(vertices.size() == values.size());
     const bool has_gradients = gradients.size() == vertices.size();
     output_vertices.clear();
@@ -1301,8 +1304,8 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
     std::vector<int> tet_edges_emax_pid;
     std::vector<int> tet_edges_emin_pid;
     std::unordered_map<string, size_t> edge_token_id_map; 
-    std::vector<VPoint> emax_inter_pts; 
-    std::vector<VPoint> emin_inter_pts; 
+    std::vector<VPoint>& emax_inter_pts_g = out_mesh_data.emax_inter_pts_g; 
+    std::vector<VPoint>& emin_inter_pts_g = out_mesh_data.emax_inter_pts_g; 
     std::vector<double> emax_inter_k; 
     std::vector<double> emin_inter_k; 
 
@@ -1336,8 +1339,8 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
                    inter_pa, inter_cur_a, edge_emin_sign, inter_pb,  inter_cur_b);
           if(edge_emax_sign > 0)
           {
-            tet_edges_emax_pid.push_back(emax_inter_pts.size());
-            emax_inter_pts.push_back(inter_pa);
+            tet_edges_emax_pid.push_back(emax_inter_pts_g.size());
+            emax_inter_pts_g.push_back(inter_pa);
             emax_inter_k.push_back(inter_cur_a);
           } else {
             tet_edges_emax_pid.push_back(-1);
@@ -1345,8 +1348,8 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
 
           if(edge_emin_sign > 0)
           {
-            tet_edges_emin_pid.push_back(emin_inter_pts.size());
-            emin_inter_pts.push_back(inter_pb);
+            tet_edges_emin_pid.push_back(emin_inter_pts_g.size());
+            emin_inter_pts_g.push_back(inter_pb);
             emin_inter_k.push_back(inter_cur_b);
           } else {
             tet_edges_emin_pid.push_back(-1);
@@ -1363,13 +1366,15 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
     std::cout << " tet_edges  size " << tet_edges.size() << std::endl;
 
     std::cout << " tet_edges_emax_pid  size " << tet_edges_emax_pid.size() << std::endl;
-    std::cout << " emax_inter_pts  size " << emax_inter_pts.size() << std::endl;
+    std::cout << " emax_inter_pts  size " << emax_inter_pts_g.size() << std::endl;
 
     std::cout << " tet_edges_emin_pid  size " << tet_edges_emin_pid.size() << std::endl;
-    std::cout << " emin_inter_pts  size " << emin_inter_pts.size() << std::endl;
+    std::cout << " emin_inter_pts  size " << emin_inter_pts_g.size() << std::endl;
 
-    std::vector<std::vector<size_t>> emax_mesh_faces;
-    std::vector<std::vector<size_t>> emin_mesh_faces;
+    // std::vector<std::vector<size_t>> emax_mesh_faces;
+    // std::vector<std::vector<size_t>> emin_mesh_faces;
+    std::vector<std::vector<size_t>>& emax_mesh_faces_g = out_mesh_data.emax_mesh_faces_g;
+    std::vector<std::vector<size_t>>& emin_mesh_faces_g = out_mesh_data.emin_mesh_faces_g;
 
     for (const auto& tet : tets)
     {
@@ -1396,9 +1401,9 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
       VPoint emin_center = {0, 0, 0}; 
       for(auto emax_pid : new_emax_ids)
       {
-        emax_center[0] += emax_inter_pts[emax_pid][0];
-        emax_center[1] += emax_inter_pts[emax_pid][1];
-        emax_center[2] += emax_inter_pts[emax_pid][2];
+        emax_center[0] += emax_inter_pts_g[emax_pid][0];
+        emax_center[1] += emax_inter_pts_g[emax_pid][1];
+        emax_center[2] += emax_inter_pts_g[emax_pid][2];
       }
       if(new_emax_ids.size() > 0)
       {
@@ -1408,9 +1413,9 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
       }
       for(auto emin_pid : new_emin_ids)
       {
-        emin_center[0] += emin_inter_pts[emin_pid][0];
-        emin_center[1] += emin_inter_pts[emin_pid][1];
-        emin_center[2] += emin_inter_pts[emin_pid][2];
+        emin_center[0] += emin_inter_pts_g[emin_pid][0];
+        emin_center[1] += emin_inter_pts_g[emin_pid][1];
+        emin_center[2] += emin_inter_pts_g[emin_pid][2];
       }
       if(new_emin_ids.size() > 0)
       {
@@ -1418,10 +1423,10 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
         emin_center[1] /= new_emin_ids.size();
         emin_center[2] /= new_emin_ids.size();
       }
-      size_t emax_center_id = emax_inter_pts.size();
-      emax_inter_pts.push_back(emax_center);
-      size_t emin_center_id = emin_inter_pts.size();
-      emin_inter_pts.push_back(emin_center);
+      size_t emax_center_id = emax_inter_pts_g.size();
+      emax_inter_pts_g.push_back(emax_center);
+      size_t emin_center_id = emin_inter_pts_g.size();
+      emin_inter_pts_g.push_back(emin_center);
       for(const auto& face: tet_faces3D)
       {
         auto [v1, v2, v3] = face;
@@ -1430,20 +1435,20 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
         std::vector<std::vector<size_t>> tet_ridge_edges;
         std::vector<std::vector<size_t>> tet_valley_edges;
         VIPSSRidges::CalculateRidegeEdges(cur_f, edge_token_id_map, tet_edges_emax_pid, 
-                                          emax_inter_pts, emax_inter_k,  tet_ridge_edges);
+                                          emax_inter_pts_g, emax_inter_k,  tet_ridge_edges);
         VIPSSRidges::CalculateRidegeEdges(cur_f, edge_token_id_map, tet_edges_emin_pid, 
-                                          emin_inter_pts, emin_inter_k,  tet_valley_edges);
+                                          emin_inter_pts_g, emin_inter_k,  tet_valley_edges);
         for(const auto& ridge : tet_ridge_edges)
         {
           out_ridge_edges.push_back(ridge);
           std::vector<size_t> new_f{emax_center_id, ridge[0], ridge[1]};
-          emax_mesh_faces.push_back(new_f);
+          emax_mesh_faces_g.push_back(new_f);
         }
         for(const auto& valley : tet_valley_edges)
         {
           out_valley_edges.push_back(valley);
           std::vector<size_t> new_f{emin_center_id, valley[0], valley[1]};
-          emin_mesh_faces.push_back(new_f);
+          emin_mesh_faces_g.push_back(new_f);
         }
       }
     }
@@ -1452,8 +1457,8 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
 
     std::string ridge_mesh_save_path =  out_dir + "ridge_mesh.ply";
     std::string valley_mesh_save_path =  out_dir + "valley_mesh.ply";
-    SaveMeshToPly(ridge_mesh_save_path, emax_inter_pts, emax_mesh_faces);
-    SaveMeshToPly(valley_mesh_save_path, emin_inter_pts, emin_mesh_faces);
+    SaveMeshToPly(ridge_mesh_save_path, emax_inter_pts_g, emax_mesh_faces_g);
+    SaveMeshToPly(valley_mesh_save_path, emin_inter_pts_g, emin_mesh_faces_g);
 
 
     std::string tet_edges_save_path =  out_dir + "tet_out_edges.obj";
@@ -1462,11 +1467,11 @@ void MarchingTet3DEdges(const std::vector<std::array<Float, 3> >& vertices,
 
     std::string ridge_edges_save_path =  out_dir + "tet_out_ridges.obj";
     VIPSSRidges::SaveRidgesToObj(ridge_edges_save_path, 
-        emax_inter_pts, out_ridge_edges, 1.0, {0, 0, 0});
+        emax_inter_pts_g, out_ridge_edges, 1.0, {0, 0, 0});
 
     std::string ridge_valley_save_path =  out_dir + "tet_out_valleys.obj";
     VIPSSRidges::SaveRidgesToObj(ridge_valley_save_path, 
-        emin_inter_pts, out_valley_edges, 1.0, {0, 0, 0});
+        emin_inter_pts_g, out_valley_edges, 1.0, {0, 0, 0});
 
     // map edge to output vertex index
     std::unordered_map<std::pair<size_t, size_t>, size_t, pair_hash> edge_map;
@@ -1540,7 +1545,7 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
                   //  const std::vector<Float>& values, 
                   //  const std::vector<std::array<Float, 3> >& gradients,
                    const std::vector<PrincipleCurvature>& pt_curvatures,
-                   const std::string& out_dir) {
+                   const std::string& out_dir, CrestMeshData& out_mesh_data) {
     assert(vertices.size() == pt_curvatures.size());
     // const bool has_gradients = gradients.size() == vertices.size();
 
@@ -1555,8 +1560,8 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
     std::vector<int> tet_edges_emax_pid;
     std::vector<int> tet_edges_emin_pid;
     std::unordered_map<string, size_t> edge_token_id_map; 
-    std::vector<VPoint> emax_inter_pts; 
-    std::vector<VPoint> emin_inter_pts; 
+    std::vector<VPoint>& emax_inter_pts_g = out_mesh_data.emax_inter_pts_g; 
+    std::vector<VPoint>& emin_inter_pts_g = out_mesh_data.emin_inter_pts_g;
     std::vector<double> emax_inter_k; 
     std::vector<double> emin_inter_k; 
     auto tet_edge_mid_sample_map = GetTetEdgeMidSampleMap();
@@ -1620,8 +1625,8 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
           
           if(edge_emax_sign > 0)
           {
-            tet_edges_emax_pid.push_back(emax_inter_pts.size());
-            emax_inter_pts.push_back(inter_pa);
+            tet_edges_emax_pid.push_back(emax_inter_pts_g.size());
+            emax_inter_pts_g.push_back(inter_pa);
             emax_inter_k.push_back(inter_cur_a);
           } else {
             tet_edges_emax_pid.push_back(-1);
@@ -1629,8 +1634,8 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
 
           if(edge_emin_sign > 0)
           {
-            tet_edges_emin_pid.push_back(emin_inter_pts.size());
-            emin_inter_pts.push_back(inter_pb);
+            tet_edges_emin_pid.push_back(emin_inter_pts_g.size());
+            emin_inter_pts_g.push_back(inter_pb);
             emin_inter_k.push_back(inter_cur_b);
           } else {
             tet_edges_emin_pid.push_back(-1);
@@ -1647,13 +1652,13 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
     std::cout << " tet_edges  size " << tet_edges.size() << std::endl;
 
     std::cout << " tet_edges_emax_pid  size " << tet_edges_emax_pid.size() << std::endl;
-    std::cout << " emax_inter_pts  size " << emax_inter_pts.size() << std::endl;
+    std::cout << " emax_inter_pts  size " << emax_inter_pts_g.size() << std::endl;
 
     std::cout << " tet_edges_emin_pid  size " << tet_edges_emin_pid.size() << std::endl;
-    std::cout << " emin_inter_pts  size " << emin_inter_pts.size() << std::endl;
+    std::cout << " emin_inter_pts  size " << emin_inter_pts_g.size() << std::endl;
 
-    std::vector<std::vector<size_t>> emax_mesh_faces;
-    std::vector<std::vector<size_t>> emin_mesh_faces;
+    std::vector<std::vector<size_t>>& emax_mesh_faces_g = out_mesh_data.emax_mesh_faces_g;
+    std::vector<std::vector<size_t>>& emin_mesh_faces_g = out_mesh_data.emin_mesh_faces_g;
 
     for (const auto& tet : tets)
     {
@@ -1680,31 +1685,31 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
       VPoint emin_center = {0, 0, 0}; 
       for(auto emax_pid : new_emax_ids)
       {
-        emax_center[0] += emax_inter_pts[emax_pid][0];
-        emax_center[1] += emax_inter_pts[emax_pid][1];
-        emax_center[2] += emax_inter_pts[emax_pid][2];
+        emax_center[0] += emax_inter_pts_g[emax_pid][0];
+        emax_center[1] += emax_inter_pts_g[emax_pid][1];
+        emax_center[2] += emax_inter_pts_g[emax_pid][2];
       }
-      size_t emax_center_id = emax_inter_pts.size();
+      size_t emax_center_id = emax_inter_pts_g.size();
       if(new_emax_ids.size() > 0)
       {
         emax_center[0] /= new_emax_ids.size();
         emax_center[1] /= new_emax_ids.size();
         emax_center[2] /= new_emax_ids.size();
-        emax_inter_pts.push_back(emax_center);
+        emax_inter_pts_g.push_back(emax_center);
       }
       for(auto emin_pid : new_emin_ids)
       {
-        emin_center[0] += emin_inter_pts[emin_pid][0];
-        emin_center[1] += emin_inter_pts[emin_pid][1];
-        emin_center[2] += emin_inter_pts[emin_pid][2];
+        emin_center[0] += emin_inter_pts_g[emin_pid][0];
+        emin_center[1] += emin_inter_pts_g[emin_pid][1];
+        emin_center[2] += emin_inter_pts_g[emin_pid][2];
       }
-      size_t emin_center_id = emin_inter_pts.size();
+      size_t emin_center_id = emin_inter_pts_g.size();
       if(new_emin_ids.size() > 0)
       {
         emin_center[0] /= new_emin_ids.size();
         emin_center[1] /= new_emin_ids.size();
         emin_center[2] /= new_emin_ids.size();
-        emin_inter_pts.push_back(emin_center);
+        emin_inter_pts_g.push_back(emin_center);
       }
       for(const auto& face: tet_faces3D)
       {
@@ -1714,27 +1719,27 @@ void MarchingTet3DCrestMesh(const std::vector<std::array<Float, 3> >& vertices,
         std::vector<std::vector<size_t>> tet_ridge_edges;
         std::vector<std::vector<size_t>> tet_valley_edges;
         VIPSSRidges::CalculateRidegeEdges(cur_f, edge_token_id_map, tet_edges_emax_pid, 
-                                          emax_inter_pts, emax_inter_k,  tet_ridge_edges);
+                                          emax_inter_pts_g, emax_inter_k,  tet_ridge_edges);
         VIPSSRidges::CalculateRidegeEdges(cur_f, edge_token_id_map, tet_edges_emin_pid, 
-                                          emin_inter_pts, emin_inter_k,  tet_valley_edges);
+                                          emin_inter_pts_g, emin_inter_k,  tet_valley_edges);
         for(const auto& ridge : tet_ridge_edges)
         {
           out_ridge_edges.push_back(ridge);
           std::vector<size_t> new_f{emax_center_id, ridge[0], ridge[1]};
-          emax_mesh_faces.push_back(new_f);
+          emax_mesh_faces_g.push_back(new_f);
         }
         for(const auto& valley : tet_valley_edges)
         {
           out_valley_edges.push_back(valley);
           std::vector<size_t> new_f{emin_center_id, valley[0], valley[1]};
-          emin_mesh_faces.push_back(new_f);
+          emin_mesh_faces_g.push_back(new_f);
         }
       }
     }
     std::string ridge_mesh_save_path =  out_dir + "ridge_mesh.ply";
     std::string valley_mesh_save_path = out_dir + "valley_mesh.ply";
-    SaveMeshToPly(ridge_mesh_save_path, emax_inter_pts, emax_mesh_faces);
-    SaveMeshToPly(valley_mesh_save_path, emin_inter_pts, emin_mesh_faces);
+    SaveMeshToPly(ridge_mesh_save_path, emax_inter_pts_g, emax_mesh_faces_g);
+    SaveMeshToPly(valley_mesh_save_path, emin_inter_pts_g, emin_mesh_faces_g);
 
     std::string tet_edges_save_path = out_dir + "tet_out_edges.obj";
     VIPSSRidges::SaveRidgesToObj(tet_edges_save_path, 
@@ -1770,14 +1775,15 @@ template void MarchingTet3DEdges<double>(const std::vector<std::array<double, 3>
                                     const std::vector<double>& values,
                                     const std::vector<std::array<double, 3> >& gradients,
                                     std::vector<std::array<double, 3> >& output_vertices,
-                                    std::vector<std::array<size_t, 3> >& output_triangles);
+                                    std::vector<std::array<size_t, 3> >& output_triangles,
+                                    CrestMeshData& out_mesh_data );
 
 template void MarchingTet3DCrestMesh<double>(const std::vector<std::array<double, 3> >& vertices,
                    const std::vector<std::array<size_t, 4> >& tets,
                   //  const std::vector<double>& values, 
                   //  const std::vector<std::array<double, 3> >& gradients,
                    const std::vector<PrincipleCurvature>& pt_curvatures,
-                   const std::string& out_di); 
+                   const std::string& out_dir, CrestMeshData& out_mesh_data); 
 
 // template void MarchingTet3DEdges<float>(const std::vector<std::array<float, 3> >& vertices,
 //                                    const std::vector<std::array<size_t, 4> >& tets,
