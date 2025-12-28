@@ -944,8 +944,8 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
     double ea_max = ca.emax_; double ea_min = ca.emin_;
     double eb_max = cb.emax_; double eb_min = cb.emin_;
 
-    double eg_a = ea_max * ea_min; 
-    double eg_b = eb_max * eb_min;
+    // double eg_a = ea_max * ea_min; 
+    // double eg_b = eb_max * eb_min;
 
     auto ta_max = ca.tmax_;  auto ta_min = ca.tmin_;
     auto tb_max = cb.tmax_;  auto tb_min = cb.tmin_;
@@ -967,9 +967,10 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
         if(ea_max * eb_max < 0 && (ca.emax_prime_ <= 0 || cb.emax_prime_ <= 0))
         // if(ea_max * eb_max < 0 )
         {
-            edge_emax_sign = 1;
-            // if(ea_max * (arma::dot(pba, ta_max)) > 0)
+            
+            if(ea_max * (arma::dot(pab, ta_max)) > 0)
             {
+                edge_emax_sign = 1;
                 double abs_sum = abs(ea_max)  + abs(eb_max);
                 
                 // InterpolateCrestPointQuadratic(pa, pb, ta_max, tb_max, ka_max, kb_max, ea_max, eb_max, inter_pa);
@@ -994,9 +995,10 @@ bool VIPSSRidges::CalculateCrestPointsSingle(const Point& pa, const Point& pb,
         if(ea_min * eb_min < 0  && (ca.emin_prime_ >= 0 || cb.emin_prime_ >= 0))
         // if(ea_min * eb_min < 0)
         {
-            edge_emin_sign = 1;
-            // if(ea_min * (arma::dot(pba, ta_min)) > 0)
+            
+            if(ea_min * (arma::dot(pab, ta_min)) < 0)
             {
+                edge_emin_sign = 1;
                 double abs_sum = abs(ea_min)  + abs(eb_min);
                 inter_cur_b = (abs(eb_min) * ka_min+ abs(ea_min) * kb_min) 
                                 /(abs(ea_min)  + abs(eb_min));
@@ -1065,9 +1067,10 @@ bool VIPSSRidges::CalculateCrestPointsSingleQuadratic(const Point& pa, const Poi
         if(ea_max * eb_max < 0 && (ca.emax_prime_ <= 0 && cb.emax_prime_ <= 0))
         // if(ea_max * eb_max < 0 )
         {
-            edge_emax_sign = 1;
-            // if(ea_max * (arma::dot(pba, ta_max)) > 0)
+            
+            if(ea_max * (arma::dot(pab, ta_max)) > 0)
             {
+                edge_emax_sign = 1;
                 double abs_sum = abs(ea_max)  + abs(eb_max);
                 double e_mid = arma::dot(ta_max, c_mid.tmax_) < 0 ? - c_mid.emax_ : c_mid.emax_;
                 double t = InterpolateQuadratic(ea_max, e_mid, eb_max);
@@ -1094,9 +1097,10 @@ bool VIPSSRidges::CalculateCrestPointsSingleQuadratic(const Point& pa, const Poi
         if(ea_min * eb_min < 0 && (ca.emin_prime_ >= 0 || cb.emin_prime_ >= 0))
         // if(ea_min * eb_min < 0)
         {
-            edge_emin_sign = 1;
-            // if(ea_min * (arma::dot(pba, ta_min)) > 0)
+            
+            if(ea_min * (arma::dot(pab, ta_min)) < 0)
             {
+                edge_emin_sign = 1;
                 double abs_sum = abs(ea_min)  + abs(eb_min);
                 inter_cur_b = (abs(eb_min) * ka_min+ abs(ea_min) * kb_min) 
                                 /(abs(ea_min)  + abs(eb_min));

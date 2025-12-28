@@ -383,17 +383,17 @@ public:
         Tensor3D third_derivs = ConstTensor3D;
         ComputeThirdDerivatives(x, y, z, third_derivs);
         Tensor4D fourth_derivs = ConstTensor4D;
-        ComputeFourthDerivatives(x, y, z, fourth_derivs);
+        // ComputeFourthDerivatives(x, y, z, fourth_derivs);
         // std::cout << " Hrbf : finish ComputeFourthDerivatives ..." << std::endl;
         // ComputeThirdDerivatives
         cur_data = ComputePrincipalCurvaturesMonga(gradient, hessian);
         // std::cout << " Hrbf : finish ComputePrincipalCurvaturesMonga ..." << std::endl;
         cur_data.e1_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t1_);
         cur_data.e2_ = ComputeCurvatureDerivative({x,y,z}, gradient, hessian, third_derivs, cur_data.t2_);
-        cur_data.e1_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
-                                         fourth_derivs, cur_data.t1_, cur_data.k1_, cur_data.e1_);
-        cur_data.e2_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
-                                         fourth_derivs, cur_data.t2_, cur_data.k2_, cur_data.e2_);    
+        // cur_data.e1_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
+        //                                  fourth_derivs, cur_data.t1_, cur_data.k1_, cur_data.e1_);
+        // cur_data.e2_prime_ = ComputeCurvatureSecondDerivative(gradient, hessian, third_derivs,  
+        //                                  fourth_derivs, cur_data.t2_, cur_data.k2_, cur_data.e2_);    
     }
     //  //height ridge
     if(0)
