@@ -1332,13 +1332,13 @@ void VIPSSUnit::RunRidgesGHRBF2()
     std::vector<double> pt_normals;
     // readXYZ(input_data_path_, pts);
     readXYZnormal(input_data_path_, pts, pt_normals);
-    // NormalizeInputPoints(pts);
+    NormalizeInputPoints(pts);
     // local_vipss_.Init(pts);
     
     std::cout << " read input pts size :  " << pts.size() / 3 << std::endl;
     std::shared_ptr<RBF_Core> rbf_ptr = std::make_shared<RBF_Core>();
     bool use_input_normal = true;
-    std::vector<double> s_vals(pts.size()/3, -10);
+    std::vector<double> s_vals(pts.size()/3, -1);
     if(!use_input_normal)
     {
         // user_lambda_ = 0.0001;
@@ -1348,10 +1348,10 @@ void VIPSSUnit::RunRidgesGHRBF2()
         s_vals = rbf_ptr->iso_vals_;
     } 
 
-    for(int i = 0; i < pts.size()/3; ++i)
-    {
-        s_vals[i] = -1.0;
-    }
+    // for(int i = 0; i < pts.size()/3; ++i)
+    // {
+    //     s_vals[i] = -1.0;
+    // }
 
     // for(int i = 0; i < pts.size()/3; ++i)
     // {
@@ -1376,7 +1376,7 @@ void VIPSSUnit::RunRidgesGHRBF2()
         }
     }
     
-    BuildGlobalHRBFVipssWithNormals(pts, pt_normals, s_vals, rbf_ptr, user_lambda_, RBF_Kernal::FifthPower);
+    BuildGlobalHRBFVipssWithNormals(pts, pt_normals, s_vals, rbf_ptr, user_lambda_, RBF_Kernal::XCube);
     // for(int i = 0; i < pts.size()/3; ++i)
     // {
     //     double dist_val = rbf_ptr->Dist_Function(R3Pt(pts[3*i], pts[3*i + 1], pts[3*i + 2]));

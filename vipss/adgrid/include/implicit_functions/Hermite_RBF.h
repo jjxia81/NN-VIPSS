@@ -487,8 +487,8 @@ public:
     Vec4 coeff_b_;
     Scalar offset_value_ = 0;
     std::vector<Vec3> control_points_;
-    HRBFKernelType kernel_type_ = HRBFKernelType::FifthPowerRBF;
-    // HRBFKernelType kernel_type_ = HRBFKernelType::CubicKernelRBF;
+    // HRBFKernelType kernel_type_ = HRBFKernelType::FifthPowerRBF;
+    HRBFKernelType kernel_type_ = HRBFKernelType::CubicKernelRBF;
     using KernelFunction = Scalar(*)(const Vec3&, const Vec3 &);
     using KernelGradient = Vec3(*)(const Vec3&, const Vec3 &);
     using KernelHessian = Eigen::Matrix<Scalar, 3, 3>(*)(const Vec3&, const Vec3 &);

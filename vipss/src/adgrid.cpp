@@ -266,8 +266,8 @@ void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution,
     // expand_bbox_min = { -0.762772, -0.220353, 0.525951};
     // expand_bbox_max = { 0.488482,  0.977300,  1.989450};
 
-    expand_bbox_min = { -4.3, -4.3, -1.5};
-    expand_bbox_max = { 4.3,  4.3,  1.5};
+    expand_bbox_min = { -1.5, -1.5, -1.5};
+    expand_bbox_max = { 1.5,  1.5,  1.5};
     mtet::MTetMesh grid_mesh = generate_tet_mesh(new_resolution, expand_bbox_min, expand_bbox_max, grid_mesh::TET5);
 
 
