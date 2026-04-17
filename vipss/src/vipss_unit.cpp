@@ -856,7 +856,7 @@ void VIPSSUnit::ReconSurface()
 void VIPSSUnit::GenerateAdaptiveGrid()
 {
     // std::cout << " test val " << test_val << std::endl;
-    std::array<size_t,3> resolution = {3, 3, 3};
+    
     std::vector<std::shared_ptr<ImplicitFunction<double>>> functions;
     // load_functions(args.function_file, functions);
 
@@ -900,8 +900,12 @@ void VIPSSUnit::GenerateAdaptiveGrid()
         auto t000 = Clock::now();   
         std::vector<std::array<double, 3> > output_vertices;
         std::vector<std::array<size_t, 3> > output_triangles;
+        
+        std::array<size_t,3> resolution = {32, 32, 32};
+        bool refing_grid = true;
         GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
-                                local_vipss_.voro_gen_.bbox_max_, functions, adgrid_threshold_, output_vertices, output_triangles);
+                                local_vipss_.voro_gen_.bbox_max_, functions, adgrid_threshold_, 
+                                output_vertices, output_triangles, refing_grid);
         auto t001 = Clock::now();
 
         for(auto& pt : output_vertices)
