@@ -589,8 +589,7 @@ void VIPSSUnit::BuildNNHRBFFunctions(const std::vector<double>& pts, const std::
     std::vector<std::array<double, 3> > output_vertices;
     std::vector<std::array<size_t, 3> > output_triangles;
     GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
-                            local_vipss_.voro_gen_.bbox_max_, out_dir_,  
-                            file_name_,  functions, 0.01, output_vertices, output_triangles);
+                            local_vipss_.voro_gen_.bbox_max_, functions, 0.01, output_vertices, output_triangles);
     auto t001 = Clock::now();
 
     // for(auto& pt : output_vertices)
@@ -902,8 +901,7 @@ void VIPSSUnit::GenerateAdaptiveGrid()
         std::vector<std::array<double, 3> > output_vertices;
         std::vector<std::array<size_t, 3> > output_triangles;
         GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
-                                local_vipss_.voro_gen_.bbox_max_, out_dir_,  
-                                file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
+                                local_vipss_.voro_gen_.bbox_max_, functions, adgrid_threshold_, output_vertices, output_triangles);
         auto t001 = Clock::now();
 
         for(auto& pt : output_vertices)
@@ -976,8 +974,7 @@ void VIPSSUnit::AdaptiveGridHRBF(std::shared_ptr<RBF_Core> g_hrbf,
 
     
       
-    GenerateAdaptiveGridOut(resolution, bbox_min, bbox_max, out_dir_,  
-                            file_name_,  functions, adgrid_threshold_, output_vertices, output_triangles);
+    GenerateAdaptiveGridOut(resolution, bbox_min, bbox_max, functions, adgrid_threshold_, output_vertices, output_triangles);
     
     auto t001 = Clock::now();
     G_VP_stats.adgrid_gen_time_ = std::chrono::nanoseconds(t001 - t000).count() / 1e9;

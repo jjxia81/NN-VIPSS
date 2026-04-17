@@ -131,10 +131,11 @@ private:
 void GenerateAdaptiveGridOut(const std::array<size_t, 3>& resolution, 
                             const std::array<double, 3>& bbox_min,
                             const std::array<double, 3>& bbox_max,
-                            const std::string& outdir,
-                            const std::string& fillname, 
+                            // const std::string& outdir,
+                            // const std::string& fillname, 
                             std::vector<std::shared_ptr<ImplicitFunction<double>>>& functions,
                             double threshold,
                             std::vector<std::array<double, 3> >& output_vertices,
-                            std::vector<std::array<size_t, 3> >& output_triangles);
+                            std::vector<std::array<size_t, 3> >& output_triangles,
+                            bool refine_grid = true);
 
