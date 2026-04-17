@@ -901,10 +901,12 @@ void VIPSSUnit::GenerateAdaptiveGrid()
         std::vector<std::array<double, 3> > output_vertices;
         std::vector<std::array<size_t, 3> > output_triangles;
         
-        std::array<size_t,3> resolution = {32, 32, 32};
+        std::array<size_t,3> resolution = {3, 3, 3};
         bool refing_grid = true;
-        GenerateAdaptiveGridOut(resolution, local_vipss_.voro_gen_.bbox_min_, 
-                                local_vipss_.voro_gen_.bbox_max_, functions, adgrid_threshold_, 
+        std::array<double,3> bounding_box_min = local_vipss_.voro_gen_.bbox_min_;
+        std::array<double,3> bounding_box_max = local_vipss_.voro_gen_.bbox_max_;
+        GenerateAdaptiveGridOut(resolution, bounding_box_min, 
+                                bounding_box_max, functions, adgrid_threshold_, 
                                 output_vertices, output_triangles, refing_grid);
         auto t001 = Clock::now();
 
