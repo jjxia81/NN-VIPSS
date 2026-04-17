@@ -568,12 +568,20 @@ void GenerateAdaptiveGridOut(
     std::cout << "bbox min " << bbox_min[0] << " " << bbox_min[1] << " " << bbox_min[2] << std::endl;
     std::cout << "bbox max " << bbox_max[0] << " " << bbox_max[1] << " " << bbox_max[2] << std::endl;
     std::cout << "refine_grid: " << (refine_grid ? "true" : "false") << std::endl;
- 
+    
+    std::array<double, 3> bbox_min_init = bbox_min;
+    std::array<double, 3> bbox_max_init = bbox_max;
     // 1. Expand bbox and build initial tet mesh.
-    const ExpandedBBox ebb = compute_expanded_bbox(bbox_min, bbox_max);
+    if(refine_grid)
+    {
+        const ExpandedBBox ebb = compute_expanded_bbox(bbox_min, bbox_max);
+        bbox_min_init = ebb.min;
+        bbox_max_init = ebb.max;
+    }
+    
     // const std::array<size_t, 3> init_resolution = {3, 3, 3};
     mtet::MTetMesh mesh = generate_tet_mesh(
-        resolution, ebb.min, ebb.max, grid_mesh::TET5);
+        resolution, bbox_min_init, bbox_max_init, grid_mesh::TET5);
     std::cout << " finish init tet mesh" << std::endl;
  
     // Cached per-vertex function/gradient values. Populated either by the
