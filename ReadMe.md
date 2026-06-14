@@ -10,7 +10,7 @@ This code implements the algorithm described in
 
 The primary function of this program is to predict the normal as well as the underlying surface of a given set of unoriented points.
 
-Currently, the code is tested on Ubuntu OS 24.04, it should work at other platforms with minor modification. If you are not familiar with compilation on windows, we provide a pre-compiled [binary files](https://gowustl-my.sharepoint.com/:u:/g/personal/jianjun_x_wustl_edu/Ea108LLPWkJJrr3xBJBVrckB4ipwM4qRdXkxsJRkugdTmQ?e=cJ3dQI) for you to try. 
+Currently, the code is tested on Ubuntu OS 24.04, it should work at other platforms with minor modification. If you are not familiar with compilation on windows, we provide a pre-compiled [binary files](https://drive.google.com/file/d/1Pi3V_s9E-7lKzR-M5n1_zgo7JewxQ6X8/view?usp=drive_link) for you to try. 
 
 To build on MacOS, a [fork](https://github.com/yig/NN-VIPSS) by Yotam Gingold might be helpful.
 
